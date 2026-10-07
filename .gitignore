@@ -1,0 +1,8 @@
+node_modules/
+dist/
+dist-electron/
+release/
+*.log
+.DS_Store
+# Fichiers de projets clients : ne jamais les versionner
+samples/private/
