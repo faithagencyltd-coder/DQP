@@ -15,7 +15,7 @@ const app = await electron.launch({
 const page = await app.firstWindow();
 page.setDefaultTimeout(15000);
 try {
-  await page.waitForSelector('.toolbar');
+  await page.waitForSelector('aside nav');
   const root = path.join(work, 'Projets');
   const bytes = [...readFileSync(file)];
   const out = await page.evaluate(async ({ root, bytes }) => {
@@ -42,8 +42,8 @@ try {
 
   // Parcours dans l'interface : nouveau projet, import par glisser-déposer, exports.
   await page.reload();
-  await page.waitForSelector('.toolbar');
-  await page.getByRole('button', { name: 'Nouveau', exact: true }).click();
+  await page.waitForSelector('aside nav');
+  await page.getByRole('button', { name: 'Nouveau projet' }).first().click();
   await page.getByPlaceholder('Ex. Villa SENOU').fill('SENOU interface');
   await page.getByRole('button', { name: 'Créer le projet' }).click();
   await page.getByText('02 — Importer').waitFor();
@@ -58,7 +58,7 @@ try {
   if (planFile) {
     // Plan PDF : pdf.js doit fonctionner dans l'application de bureau (hors ligne, file://).
     const planBytes = [...readFileSync(planFile)];
-    await page.locator('.side button', { hasText: 'Importation' }).click();
+    await page.locator('aside').getByRole('button', { name: 'Importer', exact: true }).click();
     const dt2 = await page.evaluateHandle(({ bytes }) => {
       const d = new DataTransfer();
       d.items.add(new File([new Uint8Array(bytes)], 'Plans_villa.pdf'));
@@ -66,8 +66,7 @@ try {
     }, { bytes: planBytes });
     await page.dispatchEvent('.drop', 'drop', { dataTransfer: dt2 });
     await page.getByRole('button', { name: 'Importer dans le projet' }).click();
-    await page.getByRole('heading', { name: 'Aperçu des plans' }).waitFor();
-    await page.locator('canvas').waitFor();
+    await page.locator('canvas').first().waitFor();
     await page.waitForTimeout(1500);
     const painted = await page.evaluate(() => {
       const c = document.querySelector('canvas');
@@ -80,19 +79,21 @@ try {
     await page.screenshot({ path: path.join(work, 'electron-plan.png') });
     // Relecture depuis le disque (après rechargement, sans cache de session).
     await page.reload();
-    await page.waitForSelector('.toolbar');
-    await page.locator('.side button', { hasText: 'Projets' }).click();
+    await page.waitForSelector('aside nav');
+    await page.locator('aside').getByRole('button', { name: 'Projets', exact: true }).click();
     await page.locator('tr', { hasText: 'SENOU interface' }).getByRole('button', { name: 'Ouvrir' }).click();
-    await page.locator('.side button', { hasText: 'Aperçu des plans' }).click();
-    await page.locator('canvas').waitFor();
+    await page.getByRole('tab', { name: 'Plan 2D' }).click();
+    await page.locator('canvas').first().waitFor();
     await page.waitForTimeout(1500);
-    const err = await page.locator('.empty').count();
+    const err = await page.getByText('n’est pas disponible').count();
     console.log('Aperçu après réouverture :', err ? 'ÉCHEC' : 'OK');
   }
-  for (const name of ['Excel', 'PDF', 'Rapport']) {
-    await page.locator('.toolbar .tb', { hasText: name }).click();
-    await page.locator('.toast.success', { hasText: 'enregistré' }).or(page.locator('.toast.success', { hasText: 'Rapport' })).first().waitFor();
-    await page.waitForTimeout(400);
+  for (const name of ['DQE Excel (.xlsx)', 'DQE PDF', 'Rapport d’analyse PDF']) {
+    await page.getByRole('button', { name: /^Exporter/ }).click();
+    await page.getByRole('menuitem', { name }).click();
+    await page.locator('.toast.success', { hasText: 'enregistré' }).first().waitFor();
+    await page.getByRole('button', { name: 'Exporté' }).waitFor().catch(() => {});
+    await page.waitForTimeout(1800);
   }
   await page.waitForTimeout(1500);
   const folder2 = path.join(root, 'Projet_SENOU_interface');

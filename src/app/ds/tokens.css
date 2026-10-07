@@ -1,0 +1,238 @@
+/* =====================================================================
+   DQP Design System — jetons
+   Thème sombre « technique premium » : bleu nuit, bleu électrique, cyan
+   pour l'interactif, et les trois couleurs de confiance.
+   Les jetons sont des variables CSS : Tailwind (@theme) et les feuilles
+   de style des écrans partagent exactement les mêmes valeurs.
+   ===================================================================== */
+
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+:root {
+  color-scheme: dark;
+
+  /* Fonds et surfaces (du plus profond au plus clair) */
+  --bg: #060b14;
+  --bg-2: #0a1120;
+  --surface: #0e1728;
+  --surface-2: #121e33;
+  --surface-3: #172742;
+  --surface-hover: #1a2c4b;
+  --line: #1f3253;
+  --line-2: #172640;
+  --line-strong: #2a4470;
+
+  /* Texte */
+  --text: #e7eef8;
+  --text-2: #b4c2d6;
+  --muted: #7c8ea8;
+  --faint: #56677f;
+
+  /* Marque et interaction */
+  --brand: #2f7cf6;
+  --brand-2: #5297ff;
+  --brand-soft: rgba(47, 124, 246, 0.16);
+  --cyan: #2dd4ef;
+  --cyan-soft: rgba(45, 212, 239, 0.12);
+  --focus: 0 0 0 2px var(--bg), 0 0 0 4px rgba(82, 151, 255, 0.65);
+
+  /* Confiance (§7) */
+  --ok: #22c55e;
+  --ok-bg: rgba(34, 197, 94, 0.13);
+  --warn: #f5a524;
+  --warn-bg: rgba(245, 165, 36, 0.14);
+  --bad: #f04b4b;
+  --bad-bg: rgba(240, 75, 75, 0.14);
+  --manual: #7cb4ff;
+
+  /* Formes */
+  --radius-sm: 5px;
+  --radius: 7px;
+  --radius-lg: 11px;
+  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 10px 30px rgba(0, 0, 0, 0.45);
+  --shadow-3: 0 24px 64px rgba(0, 0, 0, 0.6);
+
+  /* Mouvement : rapide et discret */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --t-fast: 120ms;
+  --t: 180ms;
+  --t-slow: 280ms;
+
+  /* Mise en page */
+  --sidebar: 232px;
+  --sidebar-collapsed: 60px;
+  --topbar: 52px;
+
+  font-family: 'Inter Variable', 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  font-feature-settings: 'cv11', 'ss01', 'tnum';
+  color: var(--text);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-2: var(--bg-2);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-hover: var(--surface-hover);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--text);
+  --color-fg-2: var(--text-2);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-brand: var(--brand);
+  --color-brand-2: var(--brand-2);
+  --color-brand-soft: var(--brand-soft);
+  --color-cyan: var(--cyan);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --font-sans: 'Inter Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', Consolas, monospace;
+  --radius-ds: var(--radius);
+  --radius-ds-lg: var(--radius-lg);
+  --shadow-ds-2: var(--shadow-2);
+  --shadow-ds-3: var(--shadow-3);
+  --ease-ds: var(--ease);
+}
+
+/* ---------- Base ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--bg);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+::selection {
+  background: rgba(82, 151, 255, 0.35);
+}
+a {
+  color: var(--brand-2);
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #22365a;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: #2d4774;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Remise à zéro minimale (couche « base » : les classes utilitaires gardent la priorité). */
+@layer base {
+  button {
+    background: none;
+    border: 0 solid transparent;
+    padding: 0;
+    margin: 0;
+    color: inherit;
+    text-align: inherit;
+  }
+  h1, h2, h3, h4, p, dl, dd, figure { margin: 0; }
+  ol, ul { margin: 0; }
+  img, svg, canvas { display: block; }
+  svg { flex-shrink: 0; }
+  [hidden] { display: none; }
+  :focus-visible { outline: none; box-shadow: var(--focus); }
+}
+
+/* ---------- Animations ---------- */
+@keyframes ds-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ds-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ds-pop {
+  from { opacity: 0; transform: scale(0.97) translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ds-slide-left {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes ds-shimmer {
+  from { background-position: -400px 0; }
+  to { background-position: 400px 0; }
+}
+@keyframes ds-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes ds-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@keyframes ds-flash {
+  from { background-color: rgba(82, 151, 255, 0.28); }
+  to { background-color: transparent; }
+}
+.anim-fade { animation: ds-fade-in var(--t) var(--ease) both; }
+.anim-rise { animation: ds-rise var(--t-slow) var(--ease) both; }
+.anim-pop { animation: ds-pop var(--t) var(--ease) both; }
+.anim-slide-left { animation: ds-slide-left var(--t-slow) var(--ease) both; }
+.anim-flash { animation: ds-flash 900ms var(--ease); }
+.stagger > * { animation: ds-rise var(--t-slow) var(--ease) both; }
+.stagger > *:nth-child(2) { animation-delay: 30ms; }
+.stagger > *:nth-child(3) { animation-delay: 60ms; }
+.stagger > *:nth-child(4) { animation-delay: 90ms; }
+.stagger > *:nth-child(5) { animation-delay: 120ms; }
+.stagger > *:nth-child(n + 6) { animation-delay: 150ms; }
+.spin { animation: ds-spin 0.9s linear infinite; }
+.pulse { animation: ds-pulse 1.6s ease-in-out infinite; }
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 0, var(--surface-3) 40%, var(--surface-2) 80%);
+  background-size: 800px 100%;
+  animation: ds-shimmer 1.3s linear infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* Les utilisateurs qui le demandent n'ont aucune animation. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}

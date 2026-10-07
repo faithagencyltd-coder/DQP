@@ -1,78 +1,73 @@
-import {
-  BookOpen, Bot, Image as ImageIcon, Calculator, ChartColumn, ClipboardCheck, Cpu, FileDown, FileSpreadsheet, FileText, FolderOpen,
-  FolderPlus, Gauge, History, Import, LayoutDashboard, Map, Redo2, Ruler, ScanSearch, Settings, Undo2, X,
-} from 'lucide-react';
-import { useEffect, useState } from 'react';
+// Coquille de l'application DQP : barre latérale, barre supérieure, espace de travail
+// du projet, contenu, barre d'état. Les écrans lourds sont chargés à la demande.
+
+import { FolderOpen, FolderPlus, X } from 'lucide-react';
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { crossCheck } from '../core/elements/crosscheck';
 import { formatMoney } from '../core/format';
-import { api } from './browserApi';
-import { useExports } from './exports';
-import { useStore, type View } from './store';
-import { AnalysisView } from './views/AnalysisView';
-import { DashboardView } from './views/DashboardView';
-import { DocumentsView } from './views/DocumentsView';
-import { DqeView } from './views/DqeView';
-import { EstimateView } from './views/EstimateView';
-import { ImportView, useImporter } from './views/ImportView';
-import { MetreView } from './views/MetreView';
-import { PlanViewerView } from './views/PlanViewerView';
-import { NewProjectDialog } from './views/NewProjectDialog';
-import { AiView, ConverterView, EngineeringView, PlansView } from './views/PlannedViews';
-import { PricesView } from './views/PricesView';
-import { ProjectInfoView } from './views/ProjectInfoView';
-import { ProjectsView } from './views/ProjectsView';
-import { SettingsView } from './views/SettingsView';
-import { PromptDialog } from './components/ui';
+import { PromptDialog } from './ds/legacy';
+import { cx, EmptyState, Skeleton } from './ds/primitives';
+import { HelpDrawer } from './features/help/HelpDrawer';
+import { CommandPalette } from './features/search/CommandPalette';
+import { WorkspaceHeader } from './features/workspace/WorkspaceHeader';
+import { useHotkey, useLocalState, useMediaQuery } from './hooks';
+import { ALL_NAV, WORKSPACE_VIEWS } from './layouts/nav';
+import { Sidebar } from './layouts/Sidebar';
+import { Topbar } from './layouts/Topbar';
+import { ImportView, useImporter } from './pages/ImportView';
+import { NewProjectDialog } from './pages/NewProjectDialog';
+import { api } from './services/api';
+import { useExports } from './services/exports';
+import { useStore, type View } from './stores/app-store';
 
-const NAV: { group: string; items: { view: View; label: string; icon: typeof Gauge; needsProject?: boolean; phase?: string }[] }[] = [
-  {
-    group: 'Projet',
-    items: [
-      { view: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
-      { view: 'projects', label: 'Projets', icon: FolderOpen },
-      { view: 'import', label: 'Importation', icon: Import, needsProject: true },
-    ],
-  },
-  {
-    group: 'Analyse et chiffrage',
-    items: [
-      { view: 'analysis', label: 'Analyse', icon: ScanSearch, needsProject: true },
-      { view: 'viewer', label: 'Aperçu des plans', icon: ImageIcon, needsProject: true },
-      { view: 'metre', label: 'Métré', icon: Ruler, needsProject: true },
-      { view: 'dqe', label: 'DQE', icon: FileSpreadsheet, needsProject: true },
-      { view: 'estimate', label: 'Estimation', icon: ChartColumn, needsProject: true },
-      { view: 'prices', label: 'Bibliothèque de prix', icon: BookOpen },
-    ],
-  },
-  {
-    group: 'Production',
-    items: [
-      { view: 'documents', label: 'Documents', icon: FileText, needsProject: true },
-      { view: 'plans', label: 'Plans techniques', icon: Map, phase: 'P5' },
-      { view: 'engineering', label: 'Engineering', icon: Calculator, phase: 'P6' },
-      { view: 'converter', label: 'Converter', icon: Cpu, phase: 'P7' },
-      { view: 'ai', label: 'DQP AI', icon: Bot, phase: 'P8' },
-    ],
-  },
-];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyComponent = React.ComponentType<any>;
+const named = (loader: () => Promise<Record<string, unknown>>, key: string) =>
+  lazy(async () => ({ default: (await loader())[key] as AnyComponent }));
 
-const FLOW: { n: string; label: string; view: View }[] = [
-  { n: '01', label: 'Nouveau projet', view: 'projects' },
-  { n: '02', label: 'Importer', view: 'import' },
-  { n: '03', label: 'Analyser', view: 'analysis' },
-  { n: '04', label: 'Vérifier', view: 'analysis' },
-  { n: '05', label: 'Métré', view: 'metre' },
-  { n: '06', label: 'DQE', view: 'dqe' },
-  { n: '07', label: 'Estimation', view: 'estimate' },
-  { n: '08', label: 'Rapport', view: 'documents' },
-  { n: '09', label: 'Exporter', view: 'documents' },
-];
+const DashboardPage = named(() => import('./pages/DashboardPage'), 'DashboardPage');
+const OverviewPage = named(() => import('./pages/OverviewPage'), 'OverviewPage');
+const ProjectsView = named(() => import('./pages/ProjectsView'), 'ProjectsView');
+const ProjectInfoView = named(() => import('./pages/ProjectInfoView'), 'ProjectInfoView');
+const AnalysisView = named(() => import('./pages/AnalysisView'), 'AnalysisView');
+const DetectionPage = named(() => import('./pages/DetectionPage'), 'DetectionPage');
+const PlanViewerView = named(() => import('./pages/PlanViewerView'), 'PlanViewerView');
+const MetreView = named(() => import('./pages/MetreView'), 'MetreView');
+const QuantitatifPage = named(() => import('./pages/QuantitatifPage'), 'QuantitatifPage');
+const DqeView = named(() => import('./pages/DqeView'), 'DqeView');
+const EstimateView = named(() => import('./pages/EstimateView'), 'EstimateView');
+const PricesView = named(() => import('./pages/PricesView'), 'PricesView');
+const DocumentsView = named(() => import('./pages/DocumentsView'), 'DocumentsView');
+const SettingsView = named(() => import('./pages/SettingsView'), 'SettingsView');
+const PlansView = named(() => import('./pages/PlannedViews'), 'PlansView');
+const EngineeringView = named(() => import('./pages/PlannedViews'), 'EngineeringView');
+const ConverterView = named(() => import('./pages/PlannedViews'), 'ConverterView');
+const AiView = named(() => import('./pages/PlannedViews'), 'AiView');
+const Model3DView = named(() => import('./pages/PlannedViews'), 'Model3DView');
+
+function PageSkeleton() {
+  return (
+    <div className="space-y-3 p-5" aria-busy="true" aria-label="Chargement de l’écran">
+      <Skeleton className="h-6 w-64" />
+      <Skeleton className="h-3 w-96" />
+      <div className="grid grid-cols-4 gap-3 pt-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-20" />)}</div>
+      <Skeleton className="h-64" />
+    </div>
+  );
+}
 
 export function App() {
   const s = useStore();
   const [newProject, setNewProject] = useState(false);
   const [versionPrompt, setVersionPrompt] = useState(false);
+  const [search, setSearch] = useState(false);
+  const [help, setHelp] = useState(false);
+  const narrow = useMediaQuery('(max-width: 1440px)');
+  const [collapsedPref, setCollapsed] = useLocalState<boolean | null>('sidebarCollapsed', null);
+  const collapsed = collapsedPref ?? narrow;
   const importer = useImporter();
   const exporter = useExports();
+  const p = s.project;
 
   // Menus natifs de l'application de bureau.
   useEffect(
@@ -92,41 +87,54 @@ export function App() {
     [s, importer, exporter],
   );
 
-  // Raccourcis clavier en mode navigateur (dans l'application, les menus les gèrent).
-  useEffect(() => {
-    if (api.platform === 'electron') return;
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); s.undo(); }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); s.redo(); }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [s]);
+  // Raccourcis de l'interface ; ceux des menus natifs sont doublés en mode navigateur.
+  const typing = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes((document.activeElement as HTMLElement | null)?.tagName ?? '');
+  useHotkey('mod+k', (e) => { e.preventDefault(); setSearch(true); });
+  useHotkey('mod+b', (e) => { e.preventDefault(); setCollapsed(!collapsed); });
+  useHotkey('f1', (e) => { e.preventDefault(); setHelp(true); });
+  const web = api.platform !== 'electron';
+  useHotkey('mod+z', (e) => { if (!typing()) { e.preventDefault(); s.undo(); } }, web);
+  useHotkey('mod+y', (e) => { if (!typing()) { e.preventDefault(); s.redo(); } }, web);
+  useHotkey('mod+s', (e) => { e.preventDefault(); if (p) setVersionPrompt(true); }, web);
 
-  const p = s.project;
-  const hasLines = !!s.result && s.result.lineCount > 0;
-  const flowDone: Record<string, boolean> = {
-    '01': !!p,
-    '02': !!p && p.sourceFiles.length > 0,
-    '03': !!p && p.analyses.length > 0,
-    '04': !!s.result && hasLines && s.result.status.to_verify === 0,
-    '05': hasLines,
-    '06': hasLines,
-    '07': !!s.result && hasLines && s.result.incomplete === 0,
-    '08': !!p && p.journal.some((j) => j.action.startsWith('Rapport')),
-    '09': !!p && p.journal.some((j) => j.action.startsWith('Export')),
-  };
+  const commands = useMemo(
+    () => [
+      { id: 'new', label: 'Nouveau projet', hint: 'Ctrl+N', run: () => setNewProject(true) },
+      ...(p
+        ? [
+            { id: 'import', label: 'Importer des fichiers', hint: 'Excel, CSV, PDF', run: () => void importer.pick() },
+            { id: 'xlsx', label: 'Exporter le DQE en Excel', run: () => void exporter.run('xlsx') },
+            { id: 'pdf', label: 'Exporter le DQE en PDF', run: () => void exporter.run('pdf-dqe') },
+            { id: 'report', label: 'Générer le rapport d’analyse', run: () => void exporter.run('pdf-report') },
+            { id: 'version', label: 'Créer une version du projet', hint: 'Ctrl+S', run: () => setVersionPrompt(true) },
+            { id: 'close', label: 'Fermer le projet', run: () => void s.closeProject() },
+          ]
+        : []),
+      { id: 'help', label: 'Aide et raccourcis clavier', hint: 'F1', run: () => setHelp(true) },
+    ],
+    [p, importer, exporter, s],
+  );
 
-  const views: Record<View, React.ReactElement> = {
-    dashboard: <DashboardView onNew={() => setNewProject(true)} onImport={() => void importer.pick()} />,
+  // Badges de la barre latérale : uniquement des comptes réels.
+  const badges = useMemo(() => {
+    if (!p || !s.result) return {};
+    const errors = [...p.analyses.flatMap((a) => a.fileAlerts), ...s.alerts].filter((a) => a.severity === 'error').length;
+    const diffs = crossCheck(p, s.result).filter((c) => c.differs && !c.resolution).length;
+    return { analysis: errors + diffs, dqe: s.result.incomplete };
+  }, [p, s.result, s.alerts]);
+
+  const pages: Record<View, ReactElement> = {
+    dashboard: <DashboardPage onNew={() => setNewProject(true)} onImport={() => void importer.pick()} />,
+    overview: <OverviewPage onImport={() => void importer.pick()} />,
+    model3d: <Model3DView />,
     projects: <ProjectsView onNew={() => setNewProject(true)} />,
     project: <ProjectInfoView />,
     import: <ImportView importer={importer} />,
     analysis: <AnalysisView />,
+    detection: <DetectionPage />,
     viewer: <PlanViewerView />,
     metre: <MetreView />,
+    quantitatif: <QuantitatifPage />,
     dqe: <DqeView />,
     estimate: <EstimateView />,
     prices: <PricesView />,
@@ -137,99 +145,61 @@ export function App() {
     ai: <AiView />,
     settings: <SettingsView />,
   };
-  const needs = NAV.flatMap((g) => g.items).find((i) => i.view === s.view)?.needsProject || s.view === 'project';
-  const current = needs && !p ? <NoProject onNew={() => setNewProject(true)} /> : views[s.view];
+  const needsProject = ALL_NAV.find((i) => i.view === s.view)?.needsProject || WORKSPACE_VIEWS.has(s.view);
+  const inWorkspace = !!p && WORKSPACE_VIEWS.has(s.view);
+  const flush = inWorkspace && s.view === 'dqe';
+  const content = needsProject && !p ? (
+    <EmptyState
+      icon={<FolderOpen size={22} />}
+      title="Aucun projet ouvert"
+      action={<><button className="btn primary" onClick={() => setNewProject(true)}><FolderPlus size={14} />Nouveau projet</button><button className="btn" onClick={() => s.go('projects')}>Ouvrir un projet</button></>}
+    >
+      Ce module travaille sur un projet. Créez un projet ou ouvrez un projet existant.
+    </EmptyState>
+  ) : pages[s.view];
 
   return (
-    <div className="app">
-      <div className="toolbar">
-        <div className="brand"><span className="logo">DQP</span>DQP</div>
-        <button className="tb" onClick={() => setNewProject(true)} title="Nouveau projet (Ctrl+N)"><FolderPlus size={16} />Nouveau</button>
-        <button className="tb" onClick={() => s.go('projects')} title="Ouvrir un projet"><FolderOpen size={16} />Ouvrir</button>
-        <button className="tb" disabled={!p} onClick={() => void importer.pick()} title="Importer un fichier (Ctrl+I)"><Import size={16} />Importer</button>
-        <span className="sep" />
-        <button className="tb" disabled={!s.canUndo} onClick={s.undo} title="Annuler (Ctrl+Z)"><Undo2 size={16} /></button>
-        <button className="tb" disabled={!s.canRedo} onClick={s.redo} title="Rétablir (Ctrl+Y)"><Redo2 size={16} /></button>
-        <span className="sep" />
-        <button className="tb" disabled={!hasLines || exporter.busy} onClick={() => void exporter.run('xlsx')} title="Exporter le DQE en Excel"><FileSpreadsheet size={16} />Excel</button>
-        <button className="tb" disabled={!hasLines || exporter.busy} onClick={() => void exporter.run('pdf-dqe')} title="Exporter le DQE en PDF"><FileDown size={16} />PDF</button>
-        <button className="tb" disabled={!p || exporter.busy} onClick={() => void exporter.run('pdf-report')} title="Rapport d’analyse PDF"><ClipboardCheck size={16} />Rapport</button>
-        <button className="tb" disabled={!p} onClick={() => setVersionPrompt(true)} title="Créer une version (Ctrl+S)"><History size={16} />Version</button>
-        <div className="proj">
-          {p && (
-            <>
-              <b style={{ color: 'var(--text)' }}>{p.info.name}</b>
-              {s.result && <span>· {formatMoney(s.result.totalHT, p.settings.currency)} HT</span>}
-              <button className="icon-btn" title="Fermer le projet" onClick={() => void s.closeProject()}><X size={15} /></button>
-            </>
+    <div className="flex h-full bg-bg text-fg">
+      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} badges={badges} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Topbar
+          exporter={exporter}
+          onSearch={() => setSearch(true)}
+          onNewProject={() => setNewProject(true)}
+          onImport={() => void importer.pick()}
+          onVersion={() => setVersionPrompt(true)}
+          onHelp={() => setHelp(true)}
+          onToggleSidebar={() => setCollapsed(!collapsed)}
+        />
+        {inWorkspace && <WorkspaceHeader />}
+        <main className={cx('relative min-h-0 flex-1 bg-[radial-gradient(1200px_500px_at_60%_-10%,rgba(47,124,246,.07),transparent)]', flush ? 'flex flex-col overflow-hidden' : 'overflow-auto')}>
+          <div key={s.view + (p?.id ?? '')} className={cx('anim-rise', flush ? 'flex min-h-0 flex-1 flex-col' : 'px-5 py-4')}>
+            <Suspense fallback={<PageSkeleton />}>{content}</Suspense>
+          </div>
+        </main>
+        <footer className="flex h-[26px] shrink-0 items-center gap-4 border-t border-line-2 bg-[#070d18] px-3 text-[11px] text-muted">
+          <span className="flex items-center gap-1.5">
+            {p ? (
+              <>
+                <span className={cx('h-1.5 w-1.5 rounded-full', s.saveState === 'error' ? 'bg-[var(--bad)]' : s.saveState === 'saved' ? 'bg-[var(--ok)]' : 'pulse bg-[var(--warn)]')} />
+                {s.saveState === 'saved' && `Modifications enregistrées${s.lastSaved ? ' à ' + new Date(s.lastSaved).toLocaleTimeString('fr-FR') : ''}`}
+                {s.saveState === 'dirty' && 'Modifications en attente…'}
+                {s.saveState === 'saving' && 'Enregistrement…'}
+                {s.saveState === 'error' && 'Échec de l’enregistrement'}
+              </>
+            ) : 'Aucun projet ouvert'}
+          </span>
+          {p && s.result && (
+            <span className="tabular-nums">
+              {s.result.lineCount} lignes · 🟢 {s.result.status.confirmed} · 🟠 {s.result.status.to_verify} · 🔴 {s.result.status.undetermined} · {formatMoney(s.result.totalHT, p.settings.currency)} HT
+            </span>
           )}
-          <button className="tb" onClick={() => s.go('settings')} title="Paramètres"><Settings size={16} /></button>
-        </div>
+          <span className="ml-auto">{api.platform === 'electron' ? 'DQP' : 'DQP (mode navigateur)'} {api.appVersion}</span>
+        </footer>
       </div>
 
-      <nav className="flow" aria-label="Parcours">
-        {FLOW.map((f, i) => (
-          <span key={f.n} style={{ display: 'flex' }}>
-            {i > 0 && <span className="arrow">›</span>}
-            <button
-              className={`${flowDone[f.n] ? 'done' : ''} ${s.view === f.view && (f.n !== '04' && f.n !== '09') ? 'active' : ''}`}
-              onClick={() => (f.n === '01' && !p ? setNewProject(true) : s.go(f.view))}
-            >
-              <span className="n">{flowDone[f.n] ? '✓' : f.n}</span>
-              {f.label}
-            </button>
-          </span>
-        ))}
-      </nav>
-
-      <div className="body">
-        <aside className="side">
-          {NAV.map((g) => (
-            <div key={g.group}>
-              <h6>{g.group}</h6>
-              {g.items.map((it) => (
-                <button key={it.view} className={s.view === it.view ? 'active' : ''} onClick={() => s.go(it.view)}>
-                  <it.icon size={16} />
-                  {it.label}
-                  {it.phase && <span className="tag">{it.phase}</span>}
-                </button>
-              ))}
-            </div>
-          ))}
-          <h6>Application</h6>
-          <button className={s.view === 'settings' ? 'active' : ''} onClick={() => s.go('settings')}><Settings size={16} />Paramètres</button>
-        </aside>
-        <main className={`main ${s.view === 'dqe' && p ? 'flush' : ''}`}>{current}</main>
-      </div>
-
-      <footer className="status">
-        <span>
-          {p ? (
-            <>
-              <span className="dot" style={{ background: s.saveState === 'error' ? '#f87171' : s.saveState === 'saved' ? '#4ade80' : '#facc15' }} />
-              {s.saveState === 'saved' && `Enregistré${s.lastSaved ? ' à ' + new Date(s.lastSaved).toLocaleTimeString('fr-FR') : ''}`}
-              {s.saveState === 'dirty' && 'Modifications en attente…'}
-              {s.saveState === 'saving' && 'Enregistrement…'}
-              {s.saveState === 'error' && 'Échec de l’enregistrement'}
-            </>
-          ) : (
-            'Aucun projet ouvert'
-          )}
-        </span>
-        {p && s.result && (
-          <span>
-            {s.result.lineCount} lignes · 🟢 {s.result.status.confirmed} · 🟠 {s.result.status.to_verify} · 🔴 {s.result.status.undetermined}
-          </span>
-        )}
-        <span className="r">
-          <span title="Les fonctions IA et services distants nécessitent Internet">
-            <span className="dot" style={{ background: s.online ? '#4ade80' : '#9ca3af' }} />
-            {s.online ? 'En ligne' : 'Hors ligne — fonctions locales disponibles'}
-          </span>
-          <span>{api.platform === 'electron' ? 'DQP' : 'DQP (mode navigateur)'} {api.appVersion}</span>
-        </span>
-      </footer>
-
+      <CommandPalette open={search} onClose={() => setSearch(false)} commands={commands} />
+      <HelpDrawer open={help} onClose={() => setHelp(false)} />
       {newProject && <NewProjectDialog onClose={() => setNewProject(false)} />}
       {versionPrompt && (
         <PromptDialog
@@ -248,29 +218,14 @@ export function App() {
         />
       )}
       {importer.dialog}
-      <div className="toasts">
+      <div className="toasts" aria-live="polite">
         {s.toasts.map((t) => (
           <div key={t.id} className={`toast ${t.kind}`}>
-            <span>{t.text}</span>
+            <span className="text-[12.5px]">{t.text}</span>
             {t.action && <button className="act" onClick={t.action.run}>{t.action.label}</button>}
             <button className="x" onClick={() => s.dismissToast(t.id)} aria-label="Fermer"><X size={14} /></button>
           </div>
         ))}
-      </div>
-    </div>
-  );
-}
-
-function NoProject({ onNew }: { onNew: () => void }) {
-  const s = useStore();
-  return (
-    <div className="empty">
-      <FolderOpen size={36} />
-      <h2>Aucun projet ouvert</h2>
-      <p>Créez un nouveau projet ou ouvrez un projet existant pour continuer.</p>
-      <div className="row" style={{ justifyContent: 'center' }}>
-        <button className="btn primary" onClick={onNew}><FolderPlus size={15} />Nouveau projet</button>
-        <button className="btn" onClick={() => s.go('projects')}><FolderOpen size={15} />Ouvrir un projet</button>
       </div>
     </div>
   );

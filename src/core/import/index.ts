@@ -53,9 +53,24 @@ export function sniff(bytes: Uint8Array): 'zip' | 'ole' | 'pdf' | 'text' | 'unkn
   return 'unknown';
 }
 
-export class ImportError extends Error {}
+export class ImportError extends Error {
+  name = 'ImportError';
+}
 
-export async function analyzeFile(name: string, bytes: Uint8Array): Promise<{ file: SourceFile; result: ImportResult }> {
+/** Progression réelle d'une analyse, étape par étape (§20). */
+export type ProgressStep = 'read' | 'extract' | 'detect' | 'verify' | 'done';
+export interface ImportProgress {
+  step: ProgressStep;
+  label: string;
+  done?: number;
+  total?: number;
+  count?: number;
+}
+export type OnProgress = (p: ImportProgress) => void;
+const noop: OnProgress = () => {};
+
+export async function analyzeFile(name: string, bytes: Uint8Array, onProgress: OnProgress = noop): Promise<{ file: SourceFile; result: ImportResult }> {
+  onProgress({ step: 'read', label: `Lecture de ${name}`, count: bytes.byteLength });
   const fmt = formatOf(name);
   const file: SourceFile = { id: newId('f'), name, kind: fmt.kind, size: bytes.byteLength, importedAt: nowIso() };
   if (fmt.support !== 'supported') {
@@ -74,16 +89,31 @@ export async function analyzeFile(name: string, bytes: Uint8Array): Promise<{ fi
       );
     }
     const grids = await readWorkbook(bytes);
-    const results = grids.map((g) => parseDqeGrid(g, file)).filter((r) => r.analysis.stats.lines > 0);
+    onProgress({ step: 'extract', label: `${grids.length} feuille(s) lue(s)`, done: grids.length, total: grids.length, count: grids.reduce((s, g) => s + g.rows.size, 0) });
+    const results = grids
+      .map((g, i) => {
+        const r = parseDqeGrid(g, file);
+        onProgress({ step: 'detect', label: `Feuille « ${g.sheet} » : ${r.analysis.stats.lines} ligne(s) d’ouvrage`, done: i + 1, total: grids.length, count: r.analysis.stats.lines });
+        return r;
+      })
+      .filter((r) => r.analysis.stats.lines > 0);
     if (results.length === 0) {
       throw new ImportError('Aucun tableau de DQE reconnu dans ce classeur (colonnes attendues : Désignation, Unité, Quantité, Prix unitaire, Montant).');
     }
-    return { file, result: mergeResults(results) };
+    const merged = mergeResults(results);
+    onProgress({ step: 'verify', label: `${merged.analysis.fileAlerts.length} contrôle(s) sur le fichier`, count: merged.analysis.fileAlerts.length });
+    onProgress({ step: 'done', label: 'Analyse terminée', count: merged.analysis.stats.lines });
+    return { file, result: merged };
   }
   if (fmt.kind === 'csv') {
     if (sig !== 'text') throw new ImportError('Ce fichier n’est pas un fichier texte CSV.');
     const text = decodeText(bytes);
-    const result = parseDqeGrid(parseCsv(text, name), file);
+    const grid = parseCsv(text, name);
+    onProgress({ step: 'extract', label: `${grid.rows.size} ligne(s) CSV lue(s)`, count: grid.rows.size });
+    const result = parseDqeGrid(grid, file);
+    onProgress({ step: 'detect', label: `${result.analysis.stats.lines} ligne(s) d’ouvrage`, count: result.analysis.stats.lines });
+    onProgress({ step: 'verify', label: `${result.analysis.fileAlerts.length} contrôle(s)`, count: result.analysis.fileAlerts.length });
+    onProgress({ step: 'done', label: 'Analyse terminée', count: result.analysis.stats.lines });
     if (result.analysis.stats.lines === 0) {
       throw new ImportError('Aucune ligne de DQE reconnue dans ce CSV (en-tête attendu : Désignation;Unité;Quantité;Prix unitaire;Montant).');
     }
@@ -148,17 +178,21 @@ export interface PlanImport {
   elements: BuildingElement[];
 }
 
-export async function analyzePlanFile(name: string, bytes: Uint8Array, pdfjs: PdfJsLib): Promise<{ file: SourceFile; plan: PlanImport }> {
+export async function analyzePlanFile(name: string, bytes: Uint8Array, pdfjs: PdfJsLib, onProgress: OnProgress = noop): Promise<{ file: SourceFile; plan: PlanImport }> {
+  onProgress({ step: 'read', label: `Lecture de ${name}`, count: bytes.byteLength });
   const file: SourceFile = { id: newId('f'), name, kind: 'pdf', size: bytes.byteLength, importedAt: nowIso() };
   if (sniff(bytes) !== 'pdf') throw new ImportError('Ce fichier porte l’extension .pdf mais son contenu n’est pas un document PDF.');
   let raw;
   try {
-    raw = await extractPdf(bytes, pdfjs);
+    raw = await extractPdf(bytes, pdfjs, (n, total, texts) => onProgress({ step: 'extract', label: `Page ${n}/${total} : ${texts} texte(s)`, done: n, total, count: texts }));
   } catch (e) {
     const msg = (e as Error).message ?? '';
     throw new ImportError(/password/i.test(msg) ? 'PDF protégé par un mot de passe : ouvrez-le et enregistrez une copie sans protection.' : `PDF illisible : ${msg}`);
   }
   const res = analyzePlan(raw, file);
+  onProgress({ step: 'detect', label: `${res.elements.length} élément(s) détecté(s)`, count: res.elements.length });
+  onProgress({ step: 'verify', label: `${res.alerts.length} contrôle(s)`, count: res.alerts.length });
+  onProgress({ step: 'done', label: 'Analyse terminée', count: res.elements.length });
   const analysis: AnalysisResult = {
     id: newId('an'),
     fileId: file.id,

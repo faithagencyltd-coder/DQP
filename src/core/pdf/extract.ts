@@ -31,7 +31,7 @@ export interface PdfRaw {
   meta: { title?: string; author?: string; creator?: string; producer?: string };
 }
 
-export async function extractPdf(bytes: Uint8Array, pdfjs: PdfJsLib): Promise<PdfRaw> {
+export async function extractPdf(bytes: Uint8Array, pdfjs: PdfJsLib, onPage?: (n: number, total: number, texts: number) => void): Promise<PdfRaw> {
   // pdf.js transfère le tampon : on lui donne une copie.
   const doc = await pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, disableFontFace: true, verbosity: 0 }).promise;
   try {
@@ -61,6 +61,9 @@ export async function extractPdf(bytes: Uint8Array, pdfjs: PdfJsLib): Promise<Pd
       }
       pages.push({ number: n, width: vp.width, height: vp.height, texts, vectorOps, images });
       page.cleanup();
+      onPage?.(n, doc.numPages, texts.length);
+      // Laisse respirer l'interface entre deux pages.
+      await new Promise((r) => setTimeout(r, 0));
     }
     return {
       pages,

@@ -5,6 +5,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { computeProject } from '../src/core/dqe';
 import { migrateProject } from '../src/core/migrate';
+import { progressSummary, projectSteps } from '../src/core/progress';
 import type { Project, ProjectSummary, ProjectVersion } from '../src/core/types';
 
 export const PROJECT_SUBFOLDERS = [
@@ -87,8 +88,11 @@ export async function listProjects(root: string): Promise<ProjectSummary[]> {
     try {
       const { project } = await loadProjectFile(folder);
       const lines = project.lots.reduce((s, l) => s + l.sections.reduce((t, x) => t + x.lines.length, 0), 0);
-      const total = computeProject(project).totalHT;
-      out.push({ id: project.id, name: project.info.name, folder, updatedAt: project.updatedAt, total, lines });
+      const r = computeProject(project);
+      out.push({
+        id: project.id, name: project.info.name, folder, updatedAt: project.updatedAt, total: r.totalHT, lines,
+        progress: progressSummary(projectSteps(project, r)), projectType: project.info.projectType, location: project.info.location, files: project.sourceFiles.length,
+      });
     } catch {
       // Dossier sans projet DQP : ignoré.
     }

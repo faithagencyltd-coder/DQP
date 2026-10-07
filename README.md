@@ -15,6 +15,20 @@ Cahier des charges complet : [`docs/CAHIER_DES_CHARGES.md`](docs/CAHIER_DES_CHAR
 ## État : Phase 1 (DQP Core) terminée · Phase 2 (analyse de fichiers) en cours
 
 Architecture complète du cahier des charges, toutes phases : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Design system et architecture de l’interface : [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md).
+
+### Interface professionnelle (v0.3)
+
+Thème sombre « technique premium », design system à base de jetons (React, TypeScript, Vite, Tailwind CSS v4).
+Barre latérale repliable avec info-bulles, barre supérieure (projet actif, recherche globale **Ctrl+K**, connexion,
+notifications tirées des vraies alertes, aide F1, profil local), espace de travail du projet (indicateurs réels,
+8 étapes avec leur état, confiance globale cliquable, onglets), vue d’ensemble en panneaux redimensionnables avec
+plan 2D (zoom, déplacement, plein écran, calques, sélection → propriétés, source, quantité, confiance),
+tableau de bord avec graphiques interactifs (coûts par lot, confiance, évolution du montant tirée du journal,
+quantités principales), pages Détection et Quantitatif, Métré avec formule dépliable, DQE avec colonnes Code /
+Source / Confiance et vue à plat triable, bibliothèque de prix avec historique et import/export Excel,
+progression d’analyse réelle étape par étape (Excel analysé dans un Web Worker). Les modules sans moteur
+(3D, plans techniques, engineering, converter, IA) affichent « En attente du moteur » : aucun résultat simulé.
 
 ### Phase 2 — Analyse des plans PDF (v0.2)
 

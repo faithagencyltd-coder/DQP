@@ -12,6 +12,9 @@ export interface AppSettings {
   projectsRoot: string;
   company: string;
   defaultVatRate: number;
+  /** Nom affiché dans le profil (utilisateur local, pas de compte en ligne). */
+  userName?: string;
+  role?: string;
 }
 
 export interface OpenedProject {

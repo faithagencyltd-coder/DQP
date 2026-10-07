@@ -1,11 +1,11 @@
 // Création et modification d'un projet. Chaque fonction renvoie un NOUVEAU projet
 // (aucune mutation en place) et inscrit l'action au journal (§40).
 
-import { dependentLines, findLine } from './dqe';
+import { computeProject, dependentLines, findLine } from './dqe';
 import { newId, normalizeUnit, nowIso, parseNumberFr } from './format';
 import type { DqeLine, DqeSection, LineField, Lot, PriceItem, Project, TrackedNumber } from './types';
 
-export const ENGINE_VERSION = '0.2.0';
+export const ENGINE_VERSION = '0.3.0';
 
 export const DEFAULT_LOTS = [
   'Installation de chantier',
@@ -45,7 +45,7 @@ export function createProject(name: string, opts: Partial<Project['info']> = {})
     analyses: [],
     elements: [],
     resolutions: [],
-    journal: [{ at, action: 'Projet créé', detail: name }],
+    journal: [{ at, action: 'Projet créé', detail: name, total: 0 }],
     createdAt: at,
     updatedAt: at,
   };
@@ -55,7 +55,7 @@ function mutate(project: Project, action: string, detail: string | undefined, fn
   const next = structuredClone(project);
   fn(next);
   next.updatedAt = nowIso();
-  next.journal.push({ at: next.updatedAt, action, detail });
+  next.journal.push({ at: next.updatedAt, action, detail, total: computeProject(next).totalHT });
   if (next.journal.length > 2000) next.journal = next.journal.slice(-2000);
   return next;
 }
@@ -136,7 +136,7 @@ export function editLine(project: Project, lineId: string, field: LineField, raw
       after = normalizeUnit(raw);
       break;
     default:
-      before = line[field];
+      before = line[field] ?? '';
       after = raw.trim();
   }
   if (before === after) return project;
@@ -162,6 +162,7 @@ export function editLine(project: Project, lineId: string, field: LineField, raw
 
 export const FIELD_LABEL: Record<LineField, string> = {
   number: 'N°',
+  code: 'Code',
   designation: 'Désignation',
   unit: 'Unité',
   quantity: 'Quantité',

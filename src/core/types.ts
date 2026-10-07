@@ -45,6 +45,7 @@ export interface ManualEdit {
 
 export type LineField =
   | 'number'
+  | 'code'
   | 'designation'
   | 'unit'
   | 'quantity'
@@ -57,6 +58,8 @@ export type LineField =
 export interface DqeLine {
   id: string;
   number: string;
+  /** Code d'ouvrage (bibliothèque ou saisi). */
+  code?: string;
   designation: string;
   unit: string;
   quantity: TrackedNumber;
@@ -144,6 +147,8 @@ export interface JournalEntry {
   at: string;
   action: string;
   detail?: string;
+  /** Total HT du projet après l'action (historique du montant estimatif). */
+  total?: number;
 }
 
 export interface ProjectInfo {
@@ -254,6 +259,9 @@ export interface PriceItem {
   location: string;
   updatedAt: string;
   source?: string;
+  observation?: string;
+  /** Historique des prix (ancien prix, date du changement). */
+  history?: { price: number; at: string }[];
 }
 
 export interface ProjectSummary {
@@ -263,6 +271,11 @@ export interface ProjectSummary {
   updatedAt: string;
   total: number;
   lines: number;
+  /** Étapes terminées / nombre d'étapes du parcours (§32). */
+  progress?: { done: number; total: number; current: string };
+  projectType?: string;
+  location?: string;
+  files?: number;
 }
 
 export interface ProjectVersion {
