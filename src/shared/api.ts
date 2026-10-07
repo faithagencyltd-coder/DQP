@@ -50,6 +50,8 @@ export interface DqpApi {
 
   pickFiles(filters: { name: string; extensions: string[] }[], multiple: boolean): Promise<PickedFile[]>;
   storeSourceFile(folder: string, name: string, bytes: Uint8Array): Promise<string>;
+  /** Relit un fichier situé dans le dossier du projet (refusé en dehors). */
+  readProjectFile(folder: string, path: string): Promise<Uint8Array>;
   /** Écrit un fichier dans un sous-dossier du projet (Exports, Analyse, DQE…). */
   writeProjectFile(folder: string, subdir: string, name: string, bytes: Uint8Array): Promise<string>;
   htmlToPdf(folder: string, subdir: string, name: string, html: string): Promise<string>;

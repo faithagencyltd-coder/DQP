@@ -21,6 +21,7 @@ const api: DqpApi = {
   readVersion: (folder, id) => invoke('versions:read', folder, id),
   pickFiles: (filters, multiple) => invoke('files:pick', filters, multiple),
   storeSourceFile: (folder, name, bytes) => invoke('files:store-source', folder, name, bytes),
+  readProjectFile: (folder, p) => invoke('files:read', folder, p),
   writeProjectFile: (folder, subdir, name, bytes) => invoke('files:write', folder, subdir, name, bytes),
   htmlToPdf: (folder, subdir, name, html) => invoke('pdf:from-html', folder, subdir, name, html),
   saveAs: (name, bytes) => invoke('files:save-as', name, bytes),

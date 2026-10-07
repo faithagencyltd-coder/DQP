@@ -1,7 +1,7 @@
 import { FileUp, Paperclip } from 'lucide-react';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { formatMoney } from '../../core/format';
-import { analyzeFile, applyImport, FORMATS, formatOf } from '../../core/import';
+import { analyzeFile, analyzePlanFile, applyImport, applyPlanImport, FORMATS, formatOf, type PlanImport } from '../../core/import';
 import type { ImportResult } from '../../core/import/dqe-parser';
 import { newId, nowIso } from '../../core/format';
 import { replaceProject } from '../../core/project';
@@ -12,11 +12,9 @@ import { api } from '../browserApi';
 import { INFO_LABEL, Modal, Panel, SeverityBadge, StatusBadge } from '../components/ui';
 import { useStore } from '../store';
 
-interface Pending {
-  picked: PickedFile;
-  file: SourceFile;
-  result: ImportResult;
-}
+type Pending =
+  | { type: 'dqe'; picked: PickedFile; file: SourceFile; result: ImportResult }
+  | { type: 'plan'; picked: PickedFile; file: SourceFile; plan: PlanImport };
 
 const ALL_EXT = FORMATS.flatMap((f) => f.info.support === 'unsupported' ? [] : f.ext);
 
@@ -26,6 +24,8 @@ export function useImporter() {
   const [unsupported, setUnsupported] = useState<{ picked: PickedFile; message: string; canAttach: boolean } | null>(null);
   const [mode, setMode] = useState<'replace' | 'append'>('replace');
   const [busy, setBusy] = useState(false);
+  // Import multiple (§26) : les fichiers choisis ensemble sont analysés l'un après l'autre.
+  const [queue, setQueue] = useState<PickedFile[]>([]);
 
   const analyze = useCallback(
     async (picked: PickedFile) => {
@@ -36,9 +36,15 @@ export function useImporter() {
       }
       setBusy(true);
       try {
-        const { file, result } = await analyzeFile(picked.name, picked.bytes);
-        setMode(s.project && s.project.lots.length > 0 ? 'append' : 'replace');
-        setPending({ picked, file, result });
+        if (fmt.kind === 'pdf') {
+          const { pdfjs } = await import('../pdfjs');
+          const { file, plan } = await analyzePlanFile(picked.name, picked.bytes, pdfjs);
+          setPending({ type: 'plan', picked, file, plan });
+        } else {
+          const { file, result } = await analyzeFile(picked.name, picked.bytes);
+          setMode(s.project && s.project.lots.length > 0 ? 'append' : 'replace');
+          setPending({ type: 'dqe', picked, file, result });
+        }
       } catch (e) {
         setUnsupported({ picked, message: (e as Error).message, canAttach: false });
       } finally {
@@ -53,36 +59,58 @@ export function useImporter() {
     const files = await api.pickFiles(
       [
         { name: 'Fichiers de projet', extensions: [...ALL_EXT] },
-        { name: 'Excel / CSV (analysés)', extensions: ['xlsx', 'xlsm', 'csv'] },
+        { name: 'Analysés : Excel, CSV, PDF', extensions: ['xlsx', 'xlsm', 'csv', 'pdf'] },
       ],
-      false,
+      true,
     );
-    if (files[0]) await analyze(files[0]);
+    if (files[0]) {
+      setQueue(files.slice(1));
+      await analyze(files[0]);
+    }
   }, [s.project, analyze]);
+
+  const next = useCallback(() => {
+    setQueue((q) => {
+      if (q[0]) void analyze(q[0]);
+      return q.slice(1);
+    });
+  }, [analyze]);
 
   const confirm = useCallback(async () => {
     if (!pending || !s.folder) return;
-    const { picked, file, result } = pending;
+    const { picked, file } = pending;
     setPending(null);
     try {
       const stored = await api.storeSourceFile(s.folder, picked.name, picked.bytes);
       const f = { ...file, storedPath: stored };
-      s.update((p) => applyImport(p, f, result, mode));
+      const analysis = pending.type === 'dqe' ? pending.result.analysis : pending.plan.analysis;
+      if (pending.type === 'dqe') {
+        const result = pending.result;
+        s.update((p) => applyImport(p, f, result, mode));
+        s.toast('success', `${picked.name} importé : ${result.analysis.stats.lines} lignes dans ${result.lots.length} lots.`);
+      } else {
+        const plan = pending.plan;
+        const { pdfCache } = await import('../pdfjs');
+        pdfCache.set(f.id, picked.bytes);
+        s.update((p) => applyPlanImport(p, f, plan));
+        s.toast('success', `${picked.name} importé : ${plan.analysis.stats.pages} page(s), ${plan.elements.length} élément(s) détecté(s).`);
+      }
       if (api.platform === 'electron') {
-        const json = new TextEncoder().encode(JSON.stringify(result.analysis, null, 1));
+        const json = new TextEncoder().encode(JSON.stringify(analysis, null, 1));
         await api.writeProjectFile(s.folder, 'Analyse', `analyse_${picked.name}.json`, json);
       }
-      s.toast('success', `${picked.name} importé : ${result.analysis.stats.lines} lignes dans ${result.lots.length} lots.`);
-      s.go('analysis');
+      if (queue.length) next();
+      else s.go(pending.type === 'plan' ? 'viewer' : 'analysis');
     } catch (e) {
       s.toast('error', `Import impossible : ${(e as Error).message}`);
     }
-  }, [pending, s, mode]);
+  }, [pending, s, mode, queue.length, next]);
 
   const attach = useCallback(async () => {
     if (!unsupported || !s.folder) return;
     const { picked } = unsupported;
     setUnsupported(null);
+    next();
     const stored = await api.storeSourceFile(s.folder, picked.name, picked.bytes);
     const fmt = formatOf(picked.name);
     const file: SourceFile = { id: newId('f'), name: picked.name, kind: fmt.kind, size: picked.bytes.byteLength, importedAt: nowIso(), storedPath: stored };
@@ -90,16 +118,23 @@ export function useImporter() {
     s.toast('info', `${picked.name} est joint au projet. Il sera analysable quand le module ${fmt.label} sera disponible (${fmt.phase}).`);
   }, [unsupported, s]);
 
+  const cancel = () => {
+    setPending(null);
+    setUnsupported(null);
+    next();
+  };
+
   let dialog: ReactNode = null;
-  if (pending) dialog = <PreviewDialog pending={pending} mode={mode} setMode={setMode} hasLots={!!s.project && s.project.lots.length > 0} onCancel={() => setPending(null)} onConfirm={() => void confirm()} />;
+  if (pending?.type === 'dqe') dialog = <PreviewDialog pending={pending} mode={mode} setMode={setMode} hasLots={!!s.project && s.project.lots.length > 0} onCancel={cancel} onConfirm={() => void confirm()} />;
+  else if (pending?.type === 'plan') dialog = <PlanPreviewDialog file={pending.file} plan={pending.plan} remaining={queue.length} onCancel={cancel} onConfirm={() => void confirm()} />;
   else if (unsupported)
     dialog = (
       <Modal
         title={`Fichier non analysable : ${unsupported.picked.name}`}
-        onClose={() => setUnsupported(null)}
+        onClose={cancel}
         footer={
           <>
-            <button className="btn" onClick={() => setUnsupported(null)}>Fermer</button>
+            <button className="btn" onClick={cancel}>Fermer</button>
             {unsupported.canAttach && <button className="btn primary" onClick={() => void attach()}><Paperclip size={14} />Joindre au projet sans analyse</button>}
           </>
         }
@@ -119,7 +154,7 @@ export function useImporter() {
 
 export type Importer = ReturnType<typeof useImporter>;
 
-function PreviewDialog(props: { pending: Pending; mode: 'replace' | 'append'; setMode: (m: 'replace' | 'append') => void; hasLots: boolean; onCancel: () => void; onConfirm: () => void }) {
+function PreviewDialog(props: { pending: Extract<Pending, { type: 'dqe' }>; mode: 'replace' | 'append'; setMode: (m: 'replace' | 'append') => void; hasLots: boolean; onCancel: () => void; onConfirm: () => void }) {
   const { file, result } = props.pending;
   const a = result.analysis;
   const total = useMemo(() => {
@@ -201,6 +236,90 @@ function PreviewDialog(props: { pending: Pending; mode: 'replace' | 'append'; se
           </div>
         ))}
         {a.fileAlerts.length === 0 && <div className="empty">Aucune anomalie détectée dans le fichier.</div>}
+      </Panel>
+    </Modal>
+  );
+}
+
+const PAGE_KIND: Record<string, string> = {
+  plan: 'Plan', coupe: 'Coupe', facade: 'Façade', masse: 'Plan de masse', toiture: 'Toiture', fondation: 'Fondations',
+  electricite: 'Électricité', plomberie: 'Plomberie', structure: 'Structure', autre: '—',
+};
+export { PAGE_KIND };
+
+function PlanPreviewDialog(props: { file: SourceFile; plan: PlanImport; remaining: number; onCancel: () => void; onConfirm: () => void }) {
+  const { analysis, elements } = props.plan;
+  const count = (k: string) => elements.filter((e) => e.kind === k).length;
+  const rooms = elements.filter((e) => e.kind === 'room');
+  return (
+    <Modal
+      wide
+      title={`03 — Analyse du plan ${props.file.name}`}
+      onClose={props.onCancel}
+      footer={
+        <>
+          {props.remaining > 0 && <span className="muted small" style={{ marginRight: 'auto' }}>{props.remaining} autre(s) fichier(s) à suivre</span>}
+          <button className="btn" onClick={props.onCancel}>Ignorer ce fichier</button>
+          <button className="btn primary" onClick={props.onConfirm}>Importer dans le projet</button>
+        </>
+      }
+    >
+      <div className="kpis">
+        <div className="kpi"><div className="v">{analysis.pages?.length ?? 0}</div><div className="l">page(s)</div></div>
+        <div className="kpi"><div className="v">{count('room')}</div><div className="l">pièce(s)</div></div>
+        <div className="kpi"><div className="v">{rooms.filter((r) => typeof r.props.surface?.value === 'number').length}</div><div className="l">surface(s) lue(s)</div></div>
+        <div className="kpi"><div className="v">{count('opening')}</div><div className="l">repère(s) de menuiserie</div></div>
+        <div className="kpi"><div className="v">{count('equipment')}</div><div className="l">équipement(s) annoté(s)</div></div>
+      </div>
+      <div className="grid2">
+        <Panel title="Pages" flush>
+          <table className="t">
+            <thead><tr><th>Page</th><th>Type</th><th>Titre</th><th>Niveau</th><th>Échelle</th><th>Contenu</th></tr></thead>
+            <tbody>
+              {(analysis.pages ?? []).map((pg) => (
+                <tr key={pg.number}>
+                  <td className="c">{pg.number}</td>
+                  <td>{PAGE_KIND[pg.kind]}</td>
+                  <td className="small">{pg.title ?? <span className="muted">—</span>}</td>
+                  <td>{pg.level ?? <span className="muted">non déterminé</span>}</td>
+                  <td>{pg.scale ? `1/${pg.scale}` : <span className="muted">—</span>}</td>
+                  <td className="small">{pg.scanned ? <span className="badge bad">🔴 scannée, non lue</span> : `${pg.textLines} textes · ${pg.dimensions} cote(s)`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
+        <Panel title="Pièces et surfaces" flush>
+          <table className="t">
+            <tbody>
+              {rooms.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.name}<div className="small muted">{r.category}{r.level ? ` · ${r.level}` : ''}</div></td>
+                  <td className="n">{typeof r.props.surface.value === 'number' ? `${String(r.props.surface.value).replace('.', ',')} m²` : '—'}</td>
+                  <td><StatusBadge status={r.props.surface.status} /></td>
+                </tr>
+              ))}
+              {rooms.length === 0 && <tr><td className="muted">Aucune pièce reconnue.</td></tr>}
+            </tbody>
+          </table>
+        </Panel>
+      </div>
+      {analysis.detected.length > 0 && (
+        <Panel title="Cartouche et informations du projet" flush>
+          <table className="t">
+            <tbody>
+              {analysis.detected.map((d, i) => (
+                <tr key={i}><td className="muted small" style={{ width: 140 }}>{INFO_LABEL[d.key]}</td><td>{d.value}</td><td><StatusBadge status={d.status} /></td><td className="small muted">page {d.source?.page}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
+      )}
+      <Panel title={`Contrôles (${analysis.fileAlerts.length})`} flush>
+        {analysis.fileAlerts.map((x) => (
+          <div key={x.id} className="alert-item"><SeverityBadge severity={x.severity} /><div className="msg small">{x.message}</div></div>
+        ))}
+        {analysis.fileAlerts.length === 0 && <div className="empty">Aucune remarque.</div>}
       </Panel>
     </Modal>
   );

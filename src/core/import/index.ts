@@ -2,8 +2,10 @@
 // pas seulement l'extension) et l'oriente vers le moteur adapté.
 
 import { newId, nowIso } from '../format';
-import { replaceProject } from '../project';
-import type { AnalysisResult, Project, SourceFile } from '../types';
+import { analyzePlan } from '../pdf/detect';
+import { extractPdf, type PdfJsLib } from '../pdf/extract';
+import { ENGINE_VERSION, replaceProject } from '../project';
+import type { AnalysisResult, BuildingElement, Project, SourceFile } from '../types';
 import { parseDqeGrid, type ImportResult } from './dqe-parser';
 import { readWorkbook } from './excel';
 import { parseCsv } from './grid';
@@ -23,7 +25,7 @@ export const FORMATS: { ext: string[]; info: FormatInfo }[] = [
   { ext: ['xlsx', 'xlsm'], info: { kind: 'excel', label: 'Excel', support: 'supported', explanation: 'Lecture des valeurs, des formules et des valeurs calculées.' } },
   { ext: ['csv', 'txt'], info: { kind: 'csv', label: 'CSV', support: 'supported', explanation: 'Séparateur « ; » ou « , » détecté automatiquement, décimales à virgule acceptées.' } },
   { ext: ['xls'], info: { kind: 'excel', label: 'Excel 97-2003', support: 'unsupported', explanation: 'Ancien format binaire non lu par le moteur actuel. Ouvrez le fichier dans Excel et enregistrez-le en .xlsx.' } },
-  { ext: ['pdf'], info: { kind: 'pdf', label: 'PDF', support: 'planned', phase: 'Phase 2', explanation: 'Analyse des plans et documents PDF prévue en phase 2.' } },
+  { ext: ['pdf'], info: { kind: 'pdf', label: 'PDF (plans)', support: 'supported', explanation: 'Plans vectoriels : texte lu avec sa position (pièces, surfaces, niveaux, échelle, cartouche, équipements et menuiseries annotés, cotes). Les pages scannées sont signalées ; leur lecture (OCR) est prévue.' } },
   { ext: ['dxf'], info: { kind: 'dxf', label: 'DXF', support: 'planned', phase: 'Phase 4', explanation: 'Format CAO ouvert : lecture prévue en phase 4.' } },
   { ext: ['dwg'], info: { kind: 'dwg', label: 'DWG', support: 'planned', phase: 'Phase 4', explanation: 'Format propriétaire : nécessite une bibliothèque sous licence (ODA). Étude technique et juridique en phase 4.' } },
   { ext: ['ifc'], info: { kind: 'ifc', label: 'IFC', support: 'planned', phase: 'Phase 4', explanation: 'Format BIM ouvert : lecture prévue en phase 4.' } },
@@ -60,6 +62,9 @@ export async function analyzeFile(name: string, bytes: Uint8Array): Promise<{ fi
     throw new ImportError(`${fmt.label} : ${fmt.explanation}`);
   }
   const sig = sniff(bytes);
+  if (fmt.kind === 'pdf') {
+    throw new ImportError('Les PDF sont analysés par analyzePlanFile.');
+  }
   if (fmt.kind === 'excel') {
     if (sig !== 'zip') {
       throw new ImportError(
@@ -133,5 +138,50 @@ export function applyImport(project: Project, file: SourceFile, result: ImportRe
       p.info.projectType = type.value.split(' / ')[0];
       p.info.projectTypeStatus = 'to_verify';
     }
+  });
+}
+
+// ---------- Plans PDF (phase 2) ----------
+
+export interface PlanImport {
+  analysis: AnalysisResult;
+  elements: BuildingElement[];
+}
+
+export async function analyzePlanFile(name: string, bytes: Uint8Array, pdfjs: PdfJsLib): Promise<{ file: SourceFile; plan: PlanImport }> {
+  const file: SourceFile = { id: newId('f'), name, kind: 'pdf', size: bytes.byteLength, importedAt: nowIso() };
+  if (sniff(bytes) !== 'pdf') throw new ImportError('Ce fichier porte l’extension .pdf mais son contenu n’est pas un document PDF.');
+  let raw;
+  try {
+    raw = await extractPdf(bytes, pdfjs);
+  } catch (e) {
+    const msg = (e as Error).message ?? '';
+    throw new ImportError(/password/i.test(msg) ? 'PDF protégé par un mot de passe : ouvrez-le et enregistrez une copie sans protection.' : `PDF illisible : ${msg}`);
+  }
+  const res = analyzePlan(raw, file);
+  const analysis: AnalysisResult = {
+    id: newId('an'),
+    fileId: file.id,
+    fileName: name,
+    analyzedAt: nowIso(),
+    engineVersion: ENGINE_VERSION,
+    detected: res.detected,
+    fileAlerts: res.alerts,
+    stats: { lots: 0, sections: 0, lines: 0, formulas: 0, brokenFormulas: 0, pages: res.pages.length, elements: res.elements.length },
+    pages: res.pages,
+  };
+  return { file, plan: { analysis, elements: res.elements } };
+}
+
+export function applyPlanImport(project: Project, file: SourceFile, plan: PlanImport): Project {
+  const rooms = plan.elements.filter((e) => e.kind === 'room').length;
+  return replaceProject(project, 'Plan importé', `${file.name} — ${plan.analysis.stats.pages} page(s), ${rooms} pièce(s), ${plan.elements.length} élément(s)`, (p) => {
+    p.sourceFiles.push(file);
+    p.analyses.push(plan.analysis);
+    p.elements.push(...plan.elements);
+    const get = (k: string) => plan.analysis.detected.find((d) => d.key === k);
+    if (!p.info.client && get('client')) p.info.client = get('client')!.value;
+    if (!p.info.location && get('location')) p.info.location = get('location')!.value;
+    if (!p.info.date && get('date')) p.info.date = get('date')!.value;
   });
 }

@@ -4,6 +4,8 @@
 import type { ProjectResult } from '../dqe';
 import { exportNumbers, groupSections } from '../dqe';
 import { amountInWords, formatNumber } from '../format';
+import { crossCheck } from '../elements/crosscheck';
+import { activeElements, effectiveStatus } from '../elements/ops';
 import type { Alert, Confidence, Project } from '../types';
 
 const esc = (s: unknown) =>
@@ -204,6 +206,9 @@ export function analysisReportHtml(project: Project, result: ProjectResult, aler
     </div>
     <p class="muted">Confirmé : valeur lue directement dans le fichier ou validée par l’utilisateur. À vérifier : valeur interprétée, nulle ou suspecte. Non déterminé : information absente — DQP n’invente aucune valeur.</p>
 
+    ${planSection(project)}
+    ${crossSection(project, result)}
+
     <h2>3. Quantités (métré issu du DQE)</h2>
     <table><thead><tr><th>Unité</th><th>Lignes</th><th>Quantité cumulée</th></tr></thead><tbody>${units}</tbody></table>
 
@@ -229,5 +234,41 @@ const DETECTED_LABEL: Record<string, string> = {
   date: 'Date',
   phase: 'Phase',
   projectType: 'Type de projet',
+  client: 'Maître d’ouvrage',
+  architect: 'Architecte',
 };
 
+
+const ELEMENT_KIND: Record<string, string> = { level: 'Niveau', room: 'Pièce', opening: 'Menuiserie', equipment: 'Équipement', surface_total: 'Surface totale' };
+
+function planSection(project: Project): string {
+  const pages = project.analyses.flatMap((a) => (a.pages ?? []).map((pg) => ({ ...pg, file: a.fileName })));
+  if (!pages.length) return '';
+  const pageRows = pages
+    .map((pg) => `<tr><td>${esc(pg.file)}</td><td class="c">${pg.number}</td><td>${esc(pg.title ?? '—')}</td><td>${esc(pg.level ?? 'non déterminé')}</td><td>${pg.scale ? '1/' + pg.scale : '—'}</td><td>${pg.scanned ? '<span class="pill bad">scannée, non lue</span>' : `${pg.textLines} textes, ${pg.dimensions} cotes`}</td></tr>`)
+    .join('');
+  const els = activeElements(project).filter((e) => e.kind !== 'level');
+  const elRows = els
+    .map((e) => {
+      const st = effectiveStatus(e) as Confidence;
+      const vals = Object.entries(e.props)
+        .map(([k, v]) => `${k} : ${v.value === null ? 'non déterminé' : typeof v.value === 'number' ? formatNumber(v.value) + ' ' + (v.unit ?? '') : esc(v.value)}`)
+        .join(' · ');
+      return `<tr><td>${ELEMENT_KIND[e.kind]}</td><td>${esc(e.name)}</td><td>${esc(e.category)}</td><td>${esc(e.level ?? '—')}</td><td>${vals}</td><td><span class="pill ${STATUS[st].cls}">${STATUS[st].label}</span></td><td>p.${e.source.page}</td></tr>`;
+    })
+    .join('');
+  const rejected = project.elements.length - activeElements(project).length;
+  return `<h2>Plans analysés</h2>
+    <table><thead><tr><th>Fichier</th><th>Page</th><th>Titre</th><th>Niveau</th><th>Échelle</th><th>Contenu</th></tr></thead><tbody>${pageRows}</tbody></table>
+    <h3>Éléments détectés dans les plans${rejected ? ` (${rejected} rejeté(s) par l’utilisateur, non repris)` : ''}</h3>
+    ${elRows ? `<table><thead><tr><th>Type</th><th>Nom lu</th><th>Catégorie</th><th>Niveau</th><th>Valeurs</th><th>État</th><th>Page</th></tr></thead><tbody>${elRows}</tbody></table>` : '<p class="muted">Aucun élément.</p>'}`;
+}
+
+function crossSection(project: Project, result: ProjectResult): string {
+  const cmp = crossCheck(project, result);
+  if (!cmp.length) return '';
+  const rows = cmp
+    .map((c) => `<tr class="${c.differs && !c.resolution ? 'warn' : ''}"><td>${esc(c.subject)}${c.indicative ? ' <span class="muted">(indicatif)</span>' : ''}</td><td>${c.values.map((v) => `${esc(v.source)} : <b>${v.value === null ? '—' : typeof v.value === 'number' ? formatNumber(v.value) : esc(v.value)}</b>`).join('<br>')}</td><td>${c.resolution ? `Retenu : ${esc(c.resolution.chosen)}` : c.differs ? '⚠️ à arbitrer' : 'concordant'}</td></tr>`)
+    .join('');
+  return `<h2>Croisement des fichiers</h2><table><thead><tr><th>Information</th><th>Valeurs par source</th><th>Décision</th></tr></thead><tbody>${rows}</tbody></table>`;
+}

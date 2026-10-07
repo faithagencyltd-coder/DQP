@@ -5,7 +5,7 @@ import { chromium } from 'playwright-core';
 import { preview } from 'vite';
 import { mkdirSync } from 'node:fs';
 
-const [file, outDir] = process.argv.slice(2);
+const [file, outDir, planFile] = process.argv.slice(2);
 mkdirSync(outDir, { recursive: true });
 const server = await preview({ preview: { port: 5199, strictPort: true }, logLevel: 'silent' });
 console.log('serveur prêt');
@@ -30,6 +30,23 @@ try {
   await page.getByRole('button', { name: 'Importer dans le projet' }).click();
   await page.getByText('03 / 04 — Analyse et vérification').waitFor();
   await shot('03-analyse');
+  if (planFile) {
+    // Import d'un plan PDF : aperçu, éléments encadrés, croisement avec le DQE.
+    await page.locator('.side button', { hasText: 'Importation' }).click();
+    const [pc] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('button', { name: 'Choisir un fichier…' }).click()]);
+    await pc.setFiles(planFile);
+    await page.getByRole('button', { name: 'Importer dans le projet' }).waitFor({ timeout: 20000 });
+    await shot('02b-apercu-plan');
+    await page.getByRole('button', { name: 'Importer dans le projet' }).click();
+    await page.getByRole('heading', { name: 'Aperçu des plans' }).waitFor();
+    await page.waitForTimeout(1500);
+    await page.locator('.panel table.t tr', { hasText: 'SEJOUR' }).first().click();
+    await page.waitForTimeout(300);
+    await shot('03b-apercu-des-plans');
+    await page.locator('.side button', { hasText: /^Analyse$/ }).click();
+    await page.getByText('Croisement des fichiers').waitFor();
+    await shot('03c-croisement');
+  }
   await page.locator('.side button', { hasText: 'DQE' }).click();
   await page.locator('.lot-item', { hasText: 'Tous les lots' }).waitFor();
   await shot('04-dqe');

@@ -110,6 +110,8 @@ export function DocumentsView({ exporter, onVersion }: { exporter: Exporter; onV
                 x.lots = old.lots;
                 x.sourceFiles = old.sourceFiles;
                 x.analyses = old.analyses;
+                x.elements = old.elements;
+                x.resolutions = old.resolutions;
               }));
               s.toast('success', `Version « ${v.label} » restaurée.`, { label: 'Annuler', run: s.undo });
             } catch (e) {

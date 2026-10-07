@@ -166,6 +166,7 @@ function registerIpc() {
     return Promise.all(r.filePaths.map(async (p) => ({ name: path.basename(p), path: p, bytes: new Uint8Array(await fs.readFile(p)) })));
   });
   handle('files:store-source', (folder: string, name: string, bytes: Uint8Array) => storage.writeInProject(folder, 'Fichiers_sources', name, toBytes(bytes)));
+  handle('files:read', (folder: string, p: string) => storage.readInProject(folder, p));
   handle('files:write', (folder: string, subdir: string, name: string, bytes: Uint8Array) => storage.writeInProject(folder, subdir, name, toBytes(bytes)));
   handle('files:save-as', async (defaultName: string, bytes: Uint8Array) => {
     const r = await dialog.showSaveDialog(win!, { defaultPath: defaultName });

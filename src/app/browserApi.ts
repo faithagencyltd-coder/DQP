@@ -2,6 +2,7 @@
 // de bureau, stockage dans le navigateur et téléchargements à la place du disque.
 
 import { computeProject } from '../core/dqe';
+import { migrateProject } from '../core/migrate';
 import type { PriceItem, Project, ProjectSummary, ProjectVersion } from '../core/types';
 import type { AppSettings, DqpApi, PickedFile } from '../shared/api';
 
@@ -45,7 +46,7 @@ const idOf = (folder: string) => folder.replace(/^navigateur:/, '');
 
 export const browserApi: DqpApi = {
   platform: 'browser',
-  appVersion: import.meta.env.VITE_DQP_VERSION ?? '0.1.0',
+  appVersion: import.meta.env.VITE_DQP_VERSION ?? '0.2.0',
   async getSettings() {
     return read<AppSettings>(K.settings, { projectsRoot: 'Stockage du navigateur', company: '', defaultVatRate: 0 });
   },
@@ -62,8 +63,9 @@ export const browserApi: DqpApi = {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)!;
       if (!key.startsWith('dqp.project.')) continue;
-      const p = read<Project | null>(key, null);
-      if (!p) continue;
+      const raw = read<Project | null>(key, null);
+      if (!raw) continue;
+      const p = migrateProject(raw);
       out.push({
         id: p.id,
         name: p.info.name,
@@ -80,9 +82,9 @@ export const browserApi: DqpApi = {
     return { project, folder: `navigateur:${project.id}` };
   },
   async openProject(folder) {
-    const p = read<Project | null>(K.project(idOf(folder)), null);
-    if (!p) throw new Error('Projet introuvable');
-    return { project: p, folder };
+    const raw = read<Project | null>(K.project(idOf(folder)), null);
+    if (!raw) throw new Error('Projet introuvable');
+    return { project: migrateProject(raw), folder };
   },
   async saveProject(folder, project) {
     write(K.project(idOf(folder)), project);
@@ -106,7 +108,7 @@ export const browserApi: DqpApi = {
   async readVersion(folder, id) {
     const v = read<(ProjectVersion & { project: Project })[]>(K.versions(idOf(folder)), []).find((x) => x.id === id);
     if (!v) throw new Error('Version introuvable');
-    return v.project;
+    return migrateProject(v.project);
   },
   pickFiles(filters, multiple) {
     return new Promise<PickedFile[]>((resolve) => {
@@ -123,6 +125,9 @@ export const browserApi: DqpApi = {
   },
   async storeSourceFile(_folder, name) {
     return `(navigateur) ${name}`;
+  },
+  async readProjectFile() {
+    throw new Error('En mode navigateur, les fichiers ne sont pas conservés : réimportez le plan pour l’afficher.');
   },
   async writeProjectFile(_folder, _subdir, name, bytes) {
     download(name, bytes);

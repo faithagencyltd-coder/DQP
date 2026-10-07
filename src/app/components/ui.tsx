@@ -9,6 +9,8 @@ export const INFO_LABEL: Record<DetectedInfo['key'], string> = {
   date: 'Date',
   phase: 'Phase',
   projectType: 'Type de projet',
+  client: 'Maître d’ouvrage',
+  architect: 'Architecte',
 };
 
 export const STATUS_LABEL: Record<Confidence, string> = {

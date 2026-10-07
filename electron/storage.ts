@@ -4,6 +4,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { computeProject } from '../src/core/dqe';
+import { migrateProject } from '../src/core/migrate';
 import type { Project, ProjectSummary, ProjectVersion } from '../src/core/types';
 
 export const PROJECT_SUBFOLDERS = [
@@ -73,9 +74,8 @@ export async function loadProjectFile(folder: string): Promise<{ project: Projec
   }
 }
 
-function validate(p: Project): Project {
-  if (!p || p.schema !== 1 || !Array.isArray(p.lots) || !p.info) throw new Error('format de projet inconnu');
-  return p;
+function validate(p: unknown): Project {
+  return migrateProject(p);
 }
 
 export async function listProjects(root: string): Promise<ProjectSummary[]> {
@@ -145,4 +145,12 @@ async function exists(p: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** Lit un fichier du dossier projet ; tout chemin qui sort du dossier est refusé. */
+export async function readInProject(folder: string, file: string): Promise<Uint8Array> {
+  const root = path.resolve(folder) + path.sep;
+  const target = path.resolve(file);
+  if (!target.startsWith(root)) throw new Error('Accès refusé : fichier hors du dossier du projet');
+  return new Uint8Array(await fs.readFile(target));
 }

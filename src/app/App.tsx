@@ -1,5 +1,5 @@
 import {
-  BookOpen, Bot, Calculator, ChartColumn, ClipboardCheck, Cpu, FileDown, FileSpreadsheet, FileText, FolderOpen,
+  BookOpen, Bot, Image as ImageIcon, Calculator, ChartColumn, ClipboardCheck, Cpu, FileDown, FileSpreadsheet, FileText, FolderOpen,
   FolderPlus, Gauge, History, Import, LayoutDashboard, Map, Redo2, Ruler, ScanSearch, Settings, Undo2, X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -14,6 +14,7 @@ import { DqeView } from './views/DqeView';
 import { EstimateView } from './views/EstimateView';
 import { ImportView, useImporter } from './views/ImportView';
 import { MetreView } from './views/MetreView';
+import { PlanViewerView } from './views/PlanViewerView';
 import { NewProjectDialog } from './views/NewProjectDialog';
 import { AiView, ConverterView, EngineeringView, PlansView } from './views/PlannedViews';
 import { PricesView } from './views/PricesView';
@@ -35,6 +36,7 @@ const NAV: { group: string; items: { view: View; label: string; icon: typeof Gau
     group: 'Analyse et chiffrage',
     items: [
       { view: 'analysis', label: 'Analyse', icon: ScanSearch, needsProject: true },
+      { view: 'viewer', label: 'Aperçu des plans', icon: ImageIcon, needsProject: true },
       { view: 'metre', label: 'Métré', icon: Ruler, needsProject: true },
       { view: 'dqe', label: 'DQE', icon: FileSpreadsheet, needsProject: true },
       { view: 'estimate', label: 'Estimation', icon: ChartColumn, needsProject: true },
@@ -123,6 +125,7 @@ export function App() {
     project: <ProjectInfoView />,
     import: <ImportView importer={importer} />,
     analysis: <AnalysisView />,
+    viewer: <PlanViewerView />,
     metre: <MetreView />,
     dqe: <DqeView />,
     estimate: <EstimateView />,

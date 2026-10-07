@@ -91,7 +91,7 @@ describe('import d’un DQE Excel', () => {
 
   test('refuse un faux .xlsx et les formats non pris en charge, sans rien inventer', async () => {
     await expect(analyzeFile('plan.xlsx', new TextEncoder().encode('pas un classeur'))).rejects.toBeInstanceOf(ImportError);
-    await expect(analyzeFile('plan.pdf', new Uint8Array([0x25, 0x50, 0x44, 0x46]))).rejects.toThrow(/phase 2/i);
+    await expect(analyzeFile('plan.rvt', new Uint8Array([1, 2, 3]))).rejects.toThrow(/IFC/);
     await expect(analyzeFile('plan.dwg', new Uint8Array([1, 2, 3]))).rejects.toThrow(/licence/i);
   });
 });

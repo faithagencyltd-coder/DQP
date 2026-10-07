@@ -9,7 +9,7 @@ import type { AppSettings } from '../shared/api';
 import { api } from './browserApi';
 
 export type View =
-  | 'dashboard' | 'projects' | 'project' | 'import' | 'analysis' | 'metre' | 'dqe' | 'estimate'
+  | 'dashboard' | 'projects' | 'project' | 'import' | 'analysis' | 'viewer' | 'metre' | 'dqe' | 'estimate'
   | 'plans' | 'engineering' | 'converter' | 'prices' | 'documents' | 'ai' | 'settings';
 
 export type SaveState = 'saved' | 'dirty' | 'saving' | 'error';

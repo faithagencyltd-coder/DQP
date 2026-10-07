@@ -1,6 +1,9 @@
 import { Check, ChevronDown, ChevronRight, Pencil } from 'lucide-react';
 import { Fragment, useMemo, useState } from 'react';
 import { detectElements, detectStructure } from '../../core/classify';
+import { crossCheck, resolve, unresolve, type Comparison } from '../../core/elements/crosscheck';
+import { acceptElement, activeElements, effectiveStatus, rejectElement } from '../../core/elements/ops';
+import { editLine } from '../../core/project';
 import { formatMoney, formatNumber } from '../../core/format';
 import { updateInfo, validateValue } from '../../core/project';
 import type { Alert, Confidence, DetectedInfo } from '../../core/types';
@@ -23,6 +26,7 @@ export function AnalysisView() {
   const detected = p.analyses.flatMap((a) => a.detected.map((d) => ({ ...d, file: a.fileName })));
   const grand = p.analyses.find((a) => a.sourceGrandTotal)?.sourceGrandTotal;
 
+  const comparisons = useMemo(() => crossCheck(p, r), [p, r]);
   const toVerify = p.lots.flatMap((lot) =>
     lot.sections.flatMap((sec) =>
       sec.lines
@@ -67,8 +71,11 @@ export function AnalysisView() {
         <div className="kpi bad"><div className="v">🔴 {r.status.undetermined}</div><div className="l">éléments non déterminés</div></div>
       </div>
 
+      {comparisons.length > 0 && <ComparisonsPanel comparisons={comparisons} />}
+      {p.elements.length > 0 && <PlanElementsPanel />}
+
       <div className="grid2">
-        <Panel title="Éléments détectés" flush>
+        <Panel title="Éléments reconnus dans le DQE" flush>
           <table className="t">
             <thead><tr><th>Élément</th><th>Famille</th><th className="n">Quantité</th><th>Unité</th><th>État</th></tr></thead>
             <tbody>
@@ -223,5 +230,121 @@ export function AnalysisView() {
         </div>
       </Panel>
     </div>
+  );
+}
+
+/** Différences entre les sources (§27) : l’utilisateur décide quelle information conserver. */
+function ComparisonsPanel({ comparisons }: { comparisons: Comparison[] }) {
+  const s = useStore();
+  const open = comparisons.filter((c) => c.differs && !c.resolution).length;
+  return (
+    <Panel title={`Croisement des fichiers — ${open} différence(s) à arbitrer`} flush>
+      <p className="small muted" style={{ margin: '8px 12px' }}>
+        Les comptages des plans sont faits à partir des étiquettes écrites sur les plans (à vérifier sur l’aperçu). Une source qui ne dit rien n’est pas comptée à zéro.
+        Choisissez la valeur à conserver ; si elle concerne une seule ligne du DQE, DQP propose de l’y appliquer (modification tracée).
+      </p>
+      <table className="t">
+        <thead><tr><th>Information</th>{['Valeurs par source', 'Décision'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+        <tbody>
+          {comparisons.map((c) => {
+            const dqe = c.values.find((v) => v.source === 'DQE');
+            const canApply = c.resolution && dqe?.lineIds?.length === 1 && typeof c.resolution.value === 'number' && c.resolution.chosen !== 'DQE' && dqe.value !== c.resolution.value;
+            return (
+              <tr key={c.key}>
+                <td style={{ width: 220 }}>
+                  {c.differs ? <b style={{ color: c.resolution ? 'var(--ok)' : 'var(--warn)' }}>{c.resolution ? '✓' : '⚠️'} {c.subject}</b> : <b>{c.subject}</b>}
+                  {c.indicative && <div className="small muted">Indicatif</div>}
+                  {c.note && <div className="small muted">{c.note}</div>}
+                </td>
+                <td>
+                  {c.values.map((v) => (
+                    <div key={v.source} className="row" style={{ marginBottom: 4, flexWrap: 'nowrap' }}>
+                      <span className="small" style={{ minWidth: 160 }}>{v.source}</span>
+                      <b style={{ minWidth: 70 }}>{v.value === null ? <span className="muted">—</span> : typeof v.value === 'number' ? `${formatNumber(v.value)}${c.unit ? ' ' + c.unit : ''}` : v.value}</b>
+                      <span className="small muted ellipsis" style={{ maxWidth: 380 }} title={v.detail}>{v.detail}</span>
+                      {c.differs && v.value !== null && c.resolution?.chosen !== v.source && (
+                        <button className="btn sm" onClick={() => s.update((p) => resolve(p, c, v))}>Retenir</button>
+                      )}
+                    </div>
+                  ))}
+                </td>
+                <td style={{ width: 230 }}>
+                  {c.resolution ? (
+                    <>
+                      <div className="small">Retenu : <b>{c.resolution.chosen}</b> ({String(c.resolution.value)})</div>
+                      <div className="row" style={{ marginTop: 4 }}>
+                        {canApply && (
+                          <button className="btn sm primary" onClick={() => s.update((p) => editLine(p, dqe!.lineIds![0], 'quantity', String(c.resolution!.value)))}>Appliquer au DQE</button>
+                        )}
+                        <button className="btn sm" onClick={() => s.update((p) => unresolve(p, c.key))}>Annuler</button>
+                      </div>
+                      {c.resolution.chosen !== 'DQE' && dqe && (dqe.lineIds?.length ?? 0) > 1 && <div className="small muted">Plusieurs lignes de DQE concernées : corrigez-les dans le DQE.</div>}
+                    </>
+                  ) : c.differs ? <span className="small muted">À arbitrer</span> : <span className="small muted">Pas de différence</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </Panel>
+  );
+}
+
+const KIND_ORDER = ['level', 'surface_total', 'room', 'opening', 'equipment'] as const;
+const KIND_TITLE: Record<string, string> = { level: 'Niveaux', surface_total: 'Surfaces totales', room: 'Pièces', opening: 'Menuiseries (repères)', equipment: 'Équipements annotés' };
+
+function PlanElementsPanel() {
+  const s = useStore();
+  const p = s.project!;
+  const [kind, setKind] = useState<(typeof KIND_ORDER)[number]>('room');
+  const list = p.elements.filter((e) => e.kind === kind);
+  const active = activeElements(p);
+  const by = (st: string) => active.filter((e) => effectiveStatus(e) === st).length;
+  return (
+    <Panel
+      title={`Éléments détectés dans les plans — 🟢 ${by('confirmed')} · 🟠 ${by('to_verify')} · 🔴 ${by('undetermined')}`}
+      actions={
+        <div className="row">
+          {KIND_ORDER.map((k) => (
+            <button key={k} className={`btn sm ${kind === k ? 'primary' : ''}`} onClick={() => setKind(k)}>{KIND_TITLE[k]} ({p.elements.filter((e) => e.kind === k).length})</button>
+          ))}
+        </div>
+      }
+      flush
+    >
+      <div style={{ maxHeight: 360, overflow: 'auto' }}>
+        <table className="t">
+          <thead><tr><th>Nom lu</th><th>Catégorie</th><th>Niveau</th><th>Valeurs</th><th>État</th><th>Source</th><th /></tr></thead>
+          <tbody>
+            {list.map((e) => {
+              const st = effectiveStatus(e);
+              return (
+                <tr key={e.id} style={{ opacity: st === 'rejected' ? 0.5 : 1 }}>
+                  <td><b>{e.name}</b></td>
+                  <td>{e.category}</td>
+                  <td>{e.level ?? <span className="muted">—</span>}</td>
+                  <td className="small">
+                    {Object.entries(e.props).map(([k, v]) => (
+                      <div key={k}>{k} : {v.value === null ? <span style={{ color: 'var(--bad)' }}>non déterminé</span> : typeof v.value === 'number' ? `${formatNumber(v.value)} ${v.unit ?? ''}` : v.value} <StatusDot status={v.status} /></div>
+                    ))}
+                  </td>
+                  <td>{st === 'rejected' ? <span className="badge grey">Rejeté</span> : <StatusBadge status={st} />}</td>
+                  <td className="small muted">{e.source.fileName} p.{e.source.page}</td>
+                  <td className="n">
+                    <div className="row" style={{ justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
+                      {st !== 'rejected' && st !== 'confirmed' && <button className="btn sm" onClick={() => s.update((x) => acceptElement(x, e.id))}><Check size={12} />Valider</button>}
+                      {st !== 'rejected' && <button className="btn sm" onClick={() => s.update((x) => rejectElement(x, e.id))}>Rejeter</button>}
+                      <button className="btn sm" onClick={() => s.go('viewer', e.id)}>Voir</button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {list.length === 0 && <tr><td colSpan={7} className="empty">Aucun élément de ce type.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
   );
 }

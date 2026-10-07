@@ -14,6 +14,10 @@ export interface SourceRef {
   cell?: string;
   /** Formule telle qu'écrite dans le fichier source. */
   formula?: string;
+  /** Pour un plan : page (à partir de 1), zone [x, y, largeur, hauteur] en points, texte lu. */
+  page?: number;
+  bbox?: [number, number, number, number];
+  text?: string;
 }
 
 /** Une valeur numérique suivie : valeur, état, origine, source et explication. */
@@ -113,7 +117,7 @@ export interface Alert {
 
 /** Information de projet détectée dans un fichier, avec sa source. */
 export interface DetectedInfo {
-  key: 'title' | 'location' | 'country' | 'date' | 'phase' | 'projectType';
+  key: 'title' | 'location' | 'country' | 'date' | 'phase' | 'projectType' | 'client' | 'architect';
   value: string;
   status: Confidence;
   source?: SourceRef;
@@ -129,7 +133,9 @@ export interface AnalysisResult {
   detected: DetectedInfo[];
   /** Alertes propres au fichier (formules cassées, totaux faux…). */
   fileAlerts: Alert[];
-  stats: { lots: number; sections: number; lines: number; formulas: number; brokenFormulas: number };
+  stats: { lots: number; sections: number; lines: number; formulas: number; brokenFormulas: number; pages?: number; elements?: number };
+  /** Résumé page par page pour un plan PDF. */
+  pages?: PlanPage[];
   /** Total général annoncé par le fichier. */
   sourceGrandTotal?: { value: number | null; source: SourceRef };
 }
@@ -157,14 +163,80 @@ export interface ProjectSettings {
   roundAmounts: boolean;
 }
 
+// ---------- Éléments du bâtiment (§4, §8, §16) ----------
+
+export type ElementKind = 'level' | 'room' | 'equipment' | 'opening' | 'surface_total';
+
+/** Valeur d'une propriété d'élément, avec son état et sa source. */
+export interface DetectedValue {
+  value: number | string | null;
+  unit?: string;
+  status: Confidence;
+  source?: SourceRef;
+  note?: string;
+}
+
+export interface ElementEdit {
+  prop: string;
+  before: string | number | null;
+  after: string | number | null;
+  at: string;
+}
+
+export interface BuildingElement {
+  id: string;
+  kind: ElementKind;
+  /** Libellé tel que lu (« CHAMBRE 1 »). */
+  name: string;
+  /** Catégorie normalisée (« Chambre », « WC », « Porte »…). */
+  category: string;
+  level?: string;
+  /** Propriétés : surface, largeur, hauteur, code… */
+  props: Record<string, DetectedValue>;
+  /** État de la détection elle-même. */
+  status: Confidence;
+  note?: string;
+  source: SourceRef;
+  validation?: { state: 'accepted' | 'rejected'; at: string };
+  edits: ElementEdit[];
+}
+
+export type PlanPageKind = 'plan' | 'coupe' | 'facade' | 'masse' | 'toiture' | 'fondation' | 'electricite' | 'plomberie' | 'structure' | 'autre';
+
+export interface PlanPage {
+  number: number;
+  kind: PlanPageKind;
+  title?: string;
+  level?: string;
+  scale?: number;
+  width: number;
+  height: number;
+  textLines: number;
+  vectorOps: number;
+  images: number;
+  scanned: boolean;
+  dimensions: number;
+}
+
+/** Choix de l'utilisateur entre des sources qui divergent (§27). */
+export interface Resolution {
+  key: string;
+  /** Source retenue (nom de fichier, « DQE » ou « Saisie »). */
+  chosen: string;
+  value: number | string;
+  at: string;
+}
+
 export interface Project {
-  schema: 1;
+  schema: 2;
   id: string;
   info: ProjectInfo;
   settings: ProjectSettings;
   sourceFiles: SourceFile[];
   lots: Lot[];
   analyses: AnalysisResult[];
+  elements: BuildingElement[];
+  resolutions: Resolution[];
   journal: JournalEntry[];
   createdAt: string;
   updatedAt: string;

@@ -12,7 +12,26 @@ Cahier des charges complet : [`docs/CAHIER_DES_CHARGES.md`](docs/CAHIER_DES_CHAR
 
 ---
 
-## État : Phase 1 — DQP Core
+## État : Phase 1 (DQP Core) terminée · Phase 2 (analyse de fichiers) en cours
+
+Architecture complète du cahier des charges, toutes phases : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+### Phase 2 — Analyse des plans PDF (v0.2)
+
+| Fonction | État |
+|---|---|
+| Lecture des PDF vectoriels hors ligne (pdf.js) avec contrôle du format réel | ✅ |
+| Type de planche (plan, coupe, façade, masse, toiture, fondations, électricité, plomberie, structure), niveau, échelle | ✅ |
+| Cartouche : intitulé, maître d’ouvrage, architecte, lieu, date | ✅ |
+| Pièces et surfaces (🟢 sur la même ligne, 🟠 rattachées par proximité, 🔴 non écrites) ; surfaces totales ; contrôle somme des pièces / surface habitable | ✅ |
+| Repères de menuiseries (P1, F2, PF1…) avec dimensions écrites ; équipements annotés ; cotes comptées | ✅ |
+| Aperçu du plan avec les éléments encadrés selon leur état ; valider / corriger / rejeter chaque élément (tracé) | ✅ |
+| Import multiple et croisement des fichiers (§27) : différences plan / DQE, arbitrage, application au DQE | ✅ |
+| Pages scannées signalées 🔴 (rien n’en est déduit) | ✅ |
+| OCR des PDF scannés | à faire |
+| Calibrage sur des plans d’architecte réels (§15) | **en attente de plans PDF réels** |
+
+### Phase 1 — DQP Core
 
 | Fonction | État |
 |---|---|
@@ -106,7 +125,7 @@ Détails : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Étude du fichier de 
 | Phase | Contenu |
 |---|---|
 | 1 — DQP Core | ✅ cette version |
-| 2 — Analyse de fichiers | PDF : textes, cotations, surfaces, pièces ; validation |
+| 2 — Analyse de fichiers | 🚧 PDF : textes, pièces, surfaces, niveaux, cartouche, validation, croisement ✅ ; OCR et calibrage sur plans réels à faire |
 | 3 — Métré intelligent | murs, ouvertures, surfaces, volumes, formules visibles |
 | 4 — Formats BIM/CAO | IFC, DXF ; DWG, Revit, Archicad après étude technique et juridique |
 | 5 — Plans techniques | propositions à valider : électricité, plomberie, fondation, masse |
