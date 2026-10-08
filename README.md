@@ -97,7 +97,7 @@ l’application avec leur phase prévue. Ils ne simulent aucune fonction.
 
 ## Installer DQP (utilisateur)
 
-1. Télécharger `DQP-Setup-0.4.0.exe` (artefact de l’intégration continue GitHub, onglet *Actions*).
+1. Télécharger `DQP-Setup-0.4.0.exe` dans la page *Releases* du dépôt (installateur construit par GitHub Actions).
 2. Lancer l’installateur. L’installateur n’est pas encore signé : Windows SmartScreen peut afficher
    « éditeur inconnu ». Dans ce cas, cliquer sur *Informations complémentaires*, puis sur *Exécuter quand même*.
 3. Les projets sont enregistrés par défaut dans `Documents\DQP Projets` (modifiable dans Paramètres).
