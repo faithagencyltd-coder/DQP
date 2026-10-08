@@ -47,7 +47,7 @@ const idOf = (folder: string) => folder.replace(/^navigateur:/, '');
 
 export const browserApi: DqpApi = {
   platform: 'browser',
-  appVersion: import.meta.env.VITE_DQP_VERSION ?? '0.3.0',
+  appVersion: import.meta.env.VITE_DQP_VERSION ?? '0.4.0',
   async getSettings() {
     return read<AppSettings>(K.settings, { projectsRoot: 'Stockage du navigateur', company: '', defaultVatRate: 0 });
   },

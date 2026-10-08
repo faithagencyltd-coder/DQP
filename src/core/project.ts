@@ -5,7 +5,7 @@ import { computeProject, dependentLines, findLine } from './dqe';
 import { newId, normalizeUnit, nowIso, parseNumberFr } from './format';
 import type { DqeLine, DqeSection, LineField, Lot, PriceItem, Project, TrackedNumber } from './types';
 
-export const ENGINE_VERSION = '0.3.0';
+export const ENGINE_VERSION = '0.4.0';
 
 export const DEFAULT_LOTS = [
   'Installation de chantier',
@@ -27,7 +27,7 @@ export const DEFAULT_LOTS = [
 export function createProject(name: string, opts: Partial<Project['info']> = {}): Project {
   const at = nowIso();
   return {
-    schema: 2,
+    schema: 3,
     id: newId('p'),
     info: {
       name,
@@ -45,6 +45,8 @@ export function createProject(name: string, opts: Partial<Project['info']> = {})
     analyses: [],
     elements: [],
     resolutions: [],
+    scales: [],
+    measurements: [],
     journal: [{ at, action: 'Projet créé', detail: name, total: 0 }],
     createdAt: at,
     updatedAt: at,

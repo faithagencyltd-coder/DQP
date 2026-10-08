@@ -3,7 +3,7 @@
 
 import type { Project } from './types';
 
-export const CURRENT_SCHEMA = 2;
+export const CURRENT_SCHEMA = 3;
 
 export function migrateProject(raw: unknown): Project {
   const p = raw as Record<string, unknown> & { schema?: number };
@@ -16,6 +16,12 @@ export function migrateProject(raw: unknown): Project {
     p.elements = [];
     p.resolutions = [];
     p.schema = 2;
+  }
+  if (p.schema === 2) {
+    // Schéma 3 : échelles des planches et mesures (métré sur plans).
+    p.scales = [];
+    p.measurements = [];
+    p.schema = 3;
   }
   return p as unknown as Project;
 }

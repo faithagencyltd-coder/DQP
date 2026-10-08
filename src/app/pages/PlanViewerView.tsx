@@ -4,10 +4,13 @@ import { ChevronLeft, ChevronRight, Import, Map as MapIcon } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react';
 import { effectiveStatus } from '../../core/elements/ops';
 import { formatNumber } from '../../core/format';
+import { addMeasurement } from '../../core/metre/measure';
+import type { Segment } from '../../core/pdf/vectors';
 import { StatusBadge } from '../ds/legacy';
 import { Split } from '../ds/layout';
-import { Button, Card, cx, EmptyState, IconButton } from '../ds/primitives';
+import { Button, Card, cx, EmptyState, IconButton, Tabs } from '../ds/primitives';
 import { ElementInspector } from '../features/plan/ElementInspector';
+import { FinishDialog, MeasurePanel, MeasureToolbar, proposeWalls, useMeasureTool } from '../features/plan/MeasureTools';
 import { KIND_LABEL, PlanCanvas } from '../features/plan/PlanCanvas';
 import { useStore } from '../stores/app-store';
 
@@ -23,9 +26,20 @@ export function PlanViewerView() {
   const [fileId, setFileId] = useState(pdfFiles[pdfFiles.length - 1]?.id ?? '');
   const [pageNo, setPageNo] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
+  const [panel, setPanel] = useState<'elements' | 'measures'>('elements');
+  const [selMeasure, setSelMeasure] = useState<string | null>(null);
+  const [segments, setSegments] = useState<Segment[] | null>(null);
 
   useEffect(() => {
     const id = s.focusLineId;
+    const m = id ? p.measurements.find((x) => x.id === id) : undefined;
+    if (m) {
+      setFileId(m.fileId);
+      setPageNo(m.page);
+      setPanel('measures');
+      setSelMeasure(m.id);
+      return;
+    }
     const e = id ? p.elements.find((x) => x.id === id) : undefined;
     if (e) {
       setFileId(e.source.fileId);
@@ -39,6 +53,32 @@ export function PlanViewerView() {
   const info = pages.find((x) => x.number === pageNo);
   const elements = useMemo(() => p.elements.filter((e) => e.source.fileId === file?.id && e.source.page === pageNo), [p.elements, file, pageNo]);
   const sel = p.elements.find((e) => e.id === selected);
+  const tool = useMeasureTool(file, pageNo);
+  const measureCount = p.measurements.filter((m) => m.fileId === file?.id && m.page === pageNo).length;
+  useEffect(() => {
+    setSegments(null);
+    // Garde la mesure sélectionnée si elle appartient à la page affichée (ouverture depuis le Métré).
+    setSelMeasure((id) => (id && p.measurements.some((m) => m.id === id && m.fileId === file?.id && m.page === pageNo) ? id : null));
+  }, [file?.id, pageNo]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (tool.measuring) setPanel('measures'); }, [tool.measuring]);
+
+  const propose = () => {
+    if (!file || !segments) return;
+    const r = proposeWalls(segments);
+    if (!r) {
+      s.toast('info', 'Aucun trait nettement plus épais que les autres sur cette page : DQP ne peut pas distinguer les murs. Tracez-les avec l’outil « Mur ».');
+      return;
+    }
+    const res = addMeasurement(p, {
+      kind: 'wall', label: `Murs proposés p.${pageNo}`, fileId: file.id, fileName: file.name, page: pageNo,
+      points: r.parts[0], parts: r.parts, height: null, deductions: [], origin: 'proposal',
+      note: `Proposition automatique : ${r.parts.length} trait(s) d’épaisseur ≥ ${formatNumber(r.threshold, 2)} pt. Un mur dessiné en double trait peut être compté deux fois, et des traits épais qui ne sont pas des murs peuvent être inclus : à vérifier sur le plan avant de valider. Hauteur à saisir.`,
+    });
+    s.update(() => res.project);
+    setPanel('measures');
+    setSelMeasure(res.id);
+    s.toast('info', `${r.parts.length} tronçon(s) de mur proposé(s) — à vérifier, hauteur à saisir.`);
+  };
 
   if (!file) {
     return (
@@ -66,10 +106,25 @@ export function PlanViewerView() {
       </div>
       <Split id="plan-viewer" sizes={[0.68, 0.32]} min={280} className="min-h-0 flex-1">
         <Card className="h-full" bodyClass="h-full p-0">
-          <PlanCanvas file={file} page={pageNo} selected={selected} onSelect={setSelected} className="h-full" />
+          <PlanCanvas
+            file={file} page={pageNo} selected={selected} onSelect={(id) => { setSelected(id); if (id) setPanel('elements'); }} className="h-full"
+            measuring={tool.measuring} withSegments onSegments={setSegments}
+            onPagePoint={tool.onPagePoint} onPageMove={tool.onPageMove}
+            overlay={(ctx) => tool.overlay(ctx, selMeasure)}
+            toolbar={<MeasureToolbar tool={tool.tool} setTool={tool.setTool} file={file} page={pageNo} onPropose={propose} segmentsReady={!!segments?.length} />}
+          />
         </Card>
-        <Card className="h-full" title={sel ? undefined : `Éléments de la page (${elements.length})`} bodyClass="h-full min-h-0 p-0">
-          {sel ? (
+        <Card className="h-full" bodyClass="flex h-full min-h-0 flex-col p-0">
+          <div className="border-b border-line-2 px-2 py-1.5">
+            <Tabs size="sm" value={panel} onChange={setPanel} items={[
+              { id: 'elements', label: `Éléments (${elements.length})` },
+              { id: 'measures', label: `Mesures (${measureCount})` },
+            ]} />
+          </div>
+          <div className="min-h-0 flex-1">
+          {panel === 'measures' ? (
+            <MeasurePanel file={file} page={pageNo} selectedId={selMeasure} onSelect={setSelMeasure} />
+          ) : sel ? (
             <ElementInspector e={sel} onClose={() => setSelected(null)} onDetail={() => s.go('detection', sel.id)} />
           ) : (
             <div className="h-full overflow-y-auto">
@@ -95,8 +150,12 @@ export function PlanViewerView() {
               })}
             </div>
           )}
+          </div>
         </Card>
       </Split>
+      {tool.finish && (
+        <FinishDialog file={file} page={pageNo} finish={tool.finish} onClose={() => tool.setFinish(null)} onCreated={(id) => { setPanel('measures'); setSelMeasure(id); }} />
+      )}
     </div>
   );
 }

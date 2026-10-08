@@ -232,8 +232,54 @@ export interface Resolution {
   at: string;
 }
 
+// ---------- Métré sur plans (§9, §10 — phase 3) ----------
+
+/** Échelle d'une planche : millimètres réels par point de page PDF. */
+export interface PlanScale {
+  fileId: string;
+  page: number;
+  mmPerPt: number;
+  source: 'written' | 'calibrated';
+  /** Ex. « 1/100 lue sur la planche » ou « étalonnée sur une cote de 4,20 m ». */
+  label: string;
+  at: string;
+}
+
+export type MeasureKind = 'length' | 'area' | 'wall' | 'count';
+
+export interface Deduction {
+  label: string;
+  /** Dimensions en mètres. */
+  width: number;
+  height: number;
+  count: number;
+  elementId?: string;
+}
+
+/** Mesure prise sur un plan (Measurement du §35). */
+export interface Measurement {
+  id: string;
+  kind: MeasureKind;
+  label: string;
+  fileId: string;
+  fileName: string;
+  page: number;
+  /** Points en coordonnées de page (points PDF, origine en haut à gauche). */
+  points: [number, number][];
+  /** Tronçons disjoints (propositions automatiques) : remplace `points` pour les longueurs. */
+  parts?: [number, number][][];
+  /** Hauteur en mètres (murs) : saisie par l'utilisateur, jamais devinée. */
+  height?: number | null;
+  deductions: Deduction[];
+  origin: 'manual' | 'proposal';
+  /** Proposition automatique non encore acceptée. */
+  accepted?: boolean;
+  note?: string;
+  createdAt: string;
+}
+
 export interface Project {
-  schema: 2;
+  schema: 3;
   id: string;
   info: ProjectInfo;
   settings: ProjectSettings;
@@ -242,6 +288,8 @@ export interface Project {
   analyses: AnalysisResult[];
   elements: BuildingElement[];
   resolutions: Resolution[];
+  scales: PlanScale[];
+  measurements: Measurement[];
   journal: JournalEntry[];
   createdAt: string;
   updatedAt: string;

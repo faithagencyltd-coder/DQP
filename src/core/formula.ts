@@ -7,6 +7,7 @@ export type Token =
   | { t: 'ref'; v: string }
   | { t: 'range'; from: string; to: string }
   | { t: 'line'; v: string }
+  | { t: 'measure'; v: string }
   | { t: 'fn'; v: string }
   | { t: 'op'; v: string }
   | { t: 'lp' }
@@ -33,9 +34,9 @@ export function tokenize(formula: string): Token[] {
       continue;
     }
     if (c === '{') {
-      const m = /^\{L:([^}]+)\}/.exec(src.slice(i));
-      if (!m) throw new FormulaError(`Référence de ligne invalide à la position ${i}`);
-      out.push({ t: 'line', v: m[1] });
+      const m = /^\{([LM]):([^}]+)\}/.exec(src.slice(i));
+      if (!m) throw new FormulaError(`Référence invalide à la position ${i}`);
+      out.push(m[1] === 'L' ? { t: 'line', v: m[2] } : { t: 'measure', v: m[2] });
       i += m[0].length;
       continue;
     }
@@ -79,6 +80,7 @@ export function tokenize(formula: string): Token[] {
 export interface Resolver {
   cell(ref: string): number | null;
   line?(id: string): number | null;
+  measure?(id: string): number | null;
 }
 
 export function colToIndex(col: string): number {
@@ -132,6 +134,10 @@ export function evaluate(formula: string, resolver: Resolver): number {
       case 'line': {
         if (!resolver.line) throw new FormulaError('Référence de ligne non prise en charge ici');
         return value(resolver.line(tk.v));
+      }
+      case 'measure': {
+        if (!resolver.measure) throw new FormulaError('Référence de mesure non prise en charge ici');
+        return value(resolver.measure(tk.v));
       }
       case 'err': throw new FormulaError(`Référence cassée ${tk.v}`);
       case 'lp': {
@@ -235,4 +241,8 @@ export function referencedLines(expression: string): string[] {
 
 export function hasBrokenReference(formula: string): boolean {
   return /#REF!|#NAME\?|#VALUE!|#DIV\/0!|#N\/A/i.test(formula);
+}
+
+export function referencedMeasures(expression: string): string[] {
+  return [...expression.matchAll(/\{M:([^}]+)\}/g)].map((m) => m[1]);
 }

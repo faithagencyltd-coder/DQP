@@ -87,6 +87,16 @@ try {
     await page.waitForTimeout(1500);
     const err = await page.getByText('n’est pas disponible').count();
     console.log('Aperçu après réouverture :', err ? 'ÉCHEC' : 'OK');
+    // Tracés vectoriels lus hors ligne (pdf.js) : la proposition de murs devient disponible.
+    const wand = page.getByRole('button', { name: /Proposer les murs/ });
+    await page.waitForFunction(() => {
+      const b = [...document.querySelectorAll('button')].find((x) => /Proposer les murs/.test(x.getAttribute('aria-label') || ''));
+      return b && !b.disabled;
+    }, null, { timeout: 15000 });
+    await wand.click();
+    await page.getByText(/tronçon\(s\) de mur proposé/).first().waitFor();
+    console.log('Proposition de murs :', await page.getByText(/tronçon\(s\) de mur proposé/).first().textContent());
+    await page.screenshot({ path: path.join(work, 'electron-metre.png') });
   }
   for (const name of ['DQE Excel (.xlsx)', 'DQE PDF', 'Rapport d’analyse PDF']) {
     await page.getByRole('button', { name: /^Exporter/ }).click();

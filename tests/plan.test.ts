@@ -136,8 +136,10 @@ describe('projet multi-fichiers', () => {
     delete old.elements;
     delete old.resolutions;
     const m = migrateProject(JSON.parse(JSON.stringify(old)));
-    expect(m.schema).toBe(2);
+    expect(m.schema).toBe(3);
     expect(m.elements).toEqual([]);
+    expect(m.measurements).toEqual([]);
+    expect(m.scales).toEqual([]);
     expect(m.info.name).toBe('Ancien');
     expect(() => migrateProject({ ...m, schema: 99 })).toThrow(/plus récente/);
   });

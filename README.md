@@ -12,10 +12,24 @@ Cahier des charges complet : [`docs/CAHIER_DES_CHARGES.md`](docs/CAHIER_DES_CHAR
 
 ---
 
-## État : Phase 1 (DQP Core) terminée · Phase 2 (analyse de fichiers) en cours
+## État : Phase 1 (DQP Core) terminée · Phases 2 (analyse de fichiers) et 3 (métré) en cours
 
 Architecture complète du cahier des charges, toutes phases : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 Design system et architecture de l’interface : [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md).
+
+### Phase 3 — Métré sur plans (v0.4)
+
+| Fonction | État |
+|---|---|
+| Lecture des tracés vectoriels du PDF (segments, épaisseurs, transformations) | ✅ |
+| Échelle par planche : étalonnage sur une cote connue (🟢), échelle lue sur la planche (🟠), contradiction signalée | ✅ |
+| Outils sur le Plan 2D : longueur, surface, mur (longueur × hauteur − ouvertures), comptage ; aimantation, Maj, annuler | ✅ |
+| Ouvertures déduites saisies ou reprises des repères de menuiserie dont les dimensions sont écrites | ✅ |
+| Proposition automatique de murs (traits épais), toujours à vérifier | ✅ |
+| Mesure → quantité d’une ligne du DQE (lien vivant, tracé, unités compatibles) ; liste des mesures dans le Métré | ✅ |
+| Import multiple : file avec format, taille, état, progression, résultat, erreurs, doublons ; tout importer | ✅ |
+| Catalogue d’ouvrages et DQE généré depuis le métré | à faire |
+| Calibrage sur des plans d’architecte réels | **en attente de plans PDF réels** |
 
 ### Interface professionnelle (v0.3)
 
@@ -83,7 +97,7 @@ l’application avec leur phase prévue. Ils ne simulent aucune fonction.
 
 ## Installer DQP (utilisateur)
 
-1. Télécharger `DQP-Setup-0.1.0.exe` (artefact de l’intégration continue GitHub, onglet *Actions*).
+1. Télécharger `DQP-Setup-0.4.0.exe` (artefact de l’intégration continue GitHub, onglet *Actions*).
 2. Lancer l’installateur. L’installateur n’est pas encore signé : Windows SmartScreen peut afficher
    « éditeur inconnu ». Dans ce cas, cliquer sur *Informations complémentaires*, puis sur *Exécuter quand même*.
 3. Les projets sont enregistrés par défaut dans `Documents\DQP Projets` (modifiable dans Paramètres).
@@ -120,6 +134,8 @@ anomalies du DQE de référence.
 src/core/            moteur, sans interface, testé
   types.ts           modèle de données (§35)
   import/            détection du format, lecture Excel/CSV, analyse du DQE, type de projet
+  pdf/               lecture des PDF : textes, pièces, cartouche, tracés vectoriels
+  metre/             métré sur plans : échelle, longueur, surface, mur, comptage
   formula.ts         évaluateur de formules de tableur
   dqe.ts             calcul : quantité retenue, montants, totaux, TVA
   checks.ts          détection des incohérences (§18)
@@ -140,7 +156,7 @@ Détails : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Étude du fichier de 
 |---|---|
 | 1 — DQP Core | ✅ cette version |
 | 2 — Analyse de fichiers | 🚧 PDF : textes, pièces, surfaces, niveaux, cartouche, validation, croisement ✅ ; OCR et calibrage sur plans réels à faire |
-| 3 — Métré intelligent | murs, ouvertures, surfaces, volumes, formules visibles |
+| 3 — Métré intelligent | 🚧 mesures à l’échelle sur les plans PDF, murs, ouvertures, lien au DQE ✅ ; volumes et catalogue d’ouvrages à faire |
 | 4 — Formats BIM/CAO | IFC, DXF ; DWG, Revit, Archicad après étude technique et juridique |
 | 5 — Plans techniques | propositions à valider : électricité, plomberie, fondation, masse |
 | 6 — Engineering | dimensionnement assisté avec hypothèses, formules, référentiel, avertissements |

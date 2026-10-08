@@ -5,6 +5,7 @@
 import { Expand, Layers, Minimize, Move, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { effectiveStatus } from '../../../core/elements/ops';
+import { pageSegments, type Segment } from '../../../core/pdf/vectors';
 import type { BuildingElement, ElementKind, SourceFile } from '../../../core/types';
 import { cx, Dropdown, IconButton, Skeleton } from '../../ds/primitives';
 import { api } from '../../services/api';
@@ -44,11 +45,37 @@ async function loadDoc(file: SourceFile, folder: string | null): Promise<Doc> {
   return p;
 }
 
-export function PlanCanvas({ file, page, selected, onSelect, compact, className }: { file: SourceFile; page: number; selected: string | null; onSelect: (id: string | null) => void; compact?: boolean; className?: string }) {
+/** Contexte transmis au calque de mesure : dimensions de la page (points) et zoom. */
+export interface OverlayCtx {
+  pw: number;
+  ph: number;
+  /** Pixels écran par point de page. */
+  pxPerPt: number;
+  segments: Segment[];
+}
+
+const segCache = new Map<string, Segment[]>();
+
+export function PlanCanvas({
+  file, page, selected, onSelect, compact, className, measuring, overlay, onPagePoint, onPageMove, withSegments, onSegments, toolbar,
+}: {
+  file: SourceFile; page: number; selected: string | null; onSelect: (id: string | null) => void; compact?: boolean; className?: string;
+  /** Un outil de mesure est actif : curseur en croix, clic = point sur la page. */
+  measuring?: boolean;
+  overlay?: (ctx: OverlayCtx) => React.ReactNode;
+  onPagePoint?: (pt: [number, number], e: React.PointerEvent) => void;
+  onPageMove?: (pt: [number, number] | null, e?: React.PointerEvent) => void;
+  withSegments?: boolean;
+  /** Tracés vectoriels de la page, une fois lus (aimantation, proposition de murs). */
+  onSegments?: (segments: Segment[]) => void;
+  toolbar?: React.ReactNode;
+}) {
   const s = useStore();
   const wrap = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [fit, setFit] = useState<{ w: number; h: number; scale: number } | null>(null);
+  const [fit, setFit] = useState<{ w: number; h: number; scale: number; pw: number; ph: number } | null>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  const [segments, setSegments] = useState<Segment[]>([]);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [error, setError] = useState<string | null>(null);
@@ -94,14 +121,30 @@ export function PlanCanvas({ file, page, selected, onSelect, compact, className 
       c.width = off.width;
       c.height = off.height;
       c.getContext('2d')!.drawImage(off, 0, 0);
-      setFit({ w: base.width * scale, h: base.height * scale, scale });
+      setFit({ w: base.width * scale, h: base.height * scale, scale, pw: base.width, ph: base.height });
       setLoading(false);
+      if (withSegments) {
+        const key = `${file.id}:${page}`;
+        if (!segCache.has(key)) {
+          const { pdfjs } = await import('../../services/pdfjs');
+          segCache.set(key, await pageSegments(pg, pdfjs.OPS));
+        }
+        setSegments(segCache.get(key)!);
+        onSegments?.(segCache.get(key)!);
+      }
     } catch (e) {
       if ((e as Error).name === 'RenderingCancelledException' || gen !== generation.current) return;
       setError((e as Error).message);
       setLoading(false);
     }
-  }, [file, page, s.folder, zoom]);
+  }, [file, page, s.folder, zoom, withSegments]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Conversion écran → point de page (points PDF, origine en haut à gauche).
+  const toPage = (e: { clientX: number; clientY: number }): [number, number] | null => {
+    const r = stage.current?.getBoundingClientRect();
+    if (!r || !fit) return null;
+    return [((e.clientX - r.left) / r.width) * fit.pw, ((e.clientY - r.top) / r.height) * fit.ph];
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -166,12 +209,13 @@ export function PlanCanvas({ file, page, selected, onSelect, compact, className 
         </Dropdown>
         <IconButton label={full ? 'Quitter le plein écran' : 'Plein écran'} size="sm" onClick={toggleFull}>{full ? <Minimize size={15} /> : <Expand size={15} />}</IconButton>
       </div>
+      {toolbar}
       <div className="pointer-events-none absolute bottom-2 left-2 z-10 flex items-center gap-1.5 rounded-[6px] bg-[rgba(14,23,40,.85)] px-2 py-1 text-[10.5px] text-muted">
-        <Move size={11} /> Glisser pour déplacer · Ctrl + molette pour zoomer
+        <Move size={11} /> {measuring ? 'Clic : ajouter un point · double-clic ou Entrée : terminer · Échap : annuler · glisser : déplacer' : 'Glisser pour déplacer · Ctrl + molette pour zoomer'}
       </div>
       <div
         ref={wrap}
-        className={cx('relative min-h-0 flex-1 overflow-hidden', dragging.current ? 'cursor-grabbing' : 'cursor-grab')}
+        className={cx('relative min-h-0 flex-1 overflow-hidden', measuring ? 'cursor-crosshair' : dragging.current ? 'cursor-grabbing' : 'cursor-grab')}
         onWheel={(e) => {
           if (!e.ctrlKey && !e.metaKey) return;
           e.preventDefault();
@@ -184,12 +228,18 @@ export function PlanCanvas({ file, page, selected, onSelect, compact, className 
         }}
         onPointerMove={(e) => {
           const d = dragging.current;
-          if (d) setPan({ x: d.px + e.clientX - d.x, y: d.py + e.clientY - d.y });
+          if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) setPan({ x: d.px + e.clientX - d.x, y: d.py + e.clientY - d.y });
+          if (measuring) onPageMove?.(toPage(e), e);
         }}
+        onPointerLeave={() => onPageMove?.(null)}
         onPointerUp={(e) => {
           const d = dragging.current;
           dragging.current = null;
-          if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 4) onSelect(null);
+          if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 4) {
+            const pt = toPage(e);
+            if (measuring && pt) onPagePoint?.(pt, e);
+            else onSelect(null);
+          }
         }}
       >
         {loading && !error && <div className="absolute inset-6"><Skeleton className="h-full w-full" /></div>}
@@ -197,6 +247,7 @@ export function PlanCanvas({ file, page, selected, onSelect, compact, className 
           <div className="flex h-full items-center justify-center p-6 text-center text-[12.5px] text-muted">{error}</div>
         ) : (
           <div
+            ref={stage}
             className="absolute left-1/2 top-1/2 transition-transform duration-150 ease-ds"
             style={{ width: fit?.w, height: fit?.h, transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})` }}
           >
@@ -204,7 +255,12 @@ export function PlanCanvas({ file, page, selected, onSelect, compact, className 
             {fit &&
               elements
                 .filter((e) => !hidden.has(e.kind))
-                .map((e) => <Marker key={e.id} e={e} scale={fit.scale} zoom={zoom} selected={selected === e.id} onSelect={onSelect} />)}
+                .map((e) => <Marker key={e.id} e={e} scale={fit.scale} zoom={zoom} selected={selected === e.id} onSelect={onSelect} passive={measuring} />)}
+            {fit && overlay && (
+              <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" viewBox={`0 0 ${fit.pw} ${fit.ph}`} preserveAspectRatio="none">
+                {overlay({ pw: fit.pw, ph: fit.ph, pxPerPt: fit.scale * zoom, segments })}
+              </svg>
+            )}
           </div>
         )}
       </div>
@@ -212,7 +268,7 @@ export function PlanCanvas({ file, page, selected, onSelect, compact, className 
   );
 }
 
-function Marker({ e, scale, zoom, selected, onSelect }: { e: BuildingElement; scale: number; zoom: number; selected: boolean; onSelect: (id: string) => void }) {
+function Marker({ e, scale, zoom, selected, onSelect, passive }: { e: BuildingElement; scale: number; zoom: number; selected: boolean; onSelect: (id: string) => void; passive?: boolean }) {
   const [x, y, w, h] = e.source.bbox ?? [0, 0, 0, 0];
   const st = effectiveStatus(e);
   const color = STATUS_COLOR[st];
@@ -225,6 +281,8 @@ function Marker({ e, scale, zoom, selected, onSelect }: { e: BuildingElement; sc
       onClick={(ev) => { ev.stopPropagation(); onSelect(e.id); }}
       className="absolute rounded-[2px] p-0 transition-[background,box-shadow] duration-150"
       style={{
+        pointerEvents: passive ? 'none' : undefined,
+        opacity: passive ? 0.45 : 1,
         left: x * scale - pad,
         top: y * scale - pad,
         width: w * scale + pad * 2,

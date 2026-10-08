@@ -163,7 +163,7 @@ Règle d’état :
   « ⚠️ Différence : PDF 4 / DQE 3 ». L’utilisateur choisit (`Resolution`). Quand le choix porte sur une
   seule ligne de DQE, DQP propose de l’appliquer, et la modification est tracée.
 
-### 5.5 Métré (§9, §10) — phase 3
+### 5.5 Métré (§9, §10) — phase 3 🚧
 Chaque règle de métré est une fonction pure qui prend des entrées sourcées et produit des étapes
 lisibles :
 
@@ -176,10 +176,35 @@ peinture = murs intérieurs nets + plafonds ; béton = section × longueur (pote
 Les entrées viennent des éléments validés (P2/P4). Une entrée manquante rend la mesure 🔴 : la règle
 ne l’estime jamais.
 
-### 5.6 Du métré au DQE (§11, §12) — phase 3
-- Un catalogue d’ouvrages (`WorkTemplate` : code, désignation, unité, lot, règle de métré associée,
-  prix par défaut tiré de la bibliothèque) permet de générer des lignes de DQE liées à leurs mesures.
-- Le lien est vivant : si l’on corrige un élément, la mesure change, et la ligne de DQE aussi.
+**Réalisé en 0.4 (`src/core/pdf/vectors.ts`, `src/core/metre/measure.ts`) :**
+- Tracés vectoriels de chaque page PDF : segments avec leur épaisseur, en suivant les matrices de
+  transformation (`cm`, `save` / `restore`). Ils servent à l’aimantation et à la proposition de murs.
+- Échelle d’une planche :
+  - 🟢 si elle est étalonnée sur une cote connue (deux points et une longueur réelle) ;
+  - 🟠 si elle est lue sur la planche (« 1/100 » : le PDF a pu être redimensionné), ou si
+    l’étalonnage contredit de plus de 10 % l’échelle écrite (`scaleConflict`) ;
+  - 🔴 sinon, et toute mesure de la page reste non déterminée.
+- Mesures (`Measurement`) :
+  - longueur (ml), surface (m², formule du lacet) ;
+  - mur = longueur × hauteur − Σ(l × h × n) des ouvertures (m²), avec une hauteur saisie et jamais
+    devinée ;
+  - comptage (u).
+- Chaque mesure écrit ses étapes de calcul.
+- Ouvertures déduites : saisies, ou reprises d’un repère de menuiserie dont les dimensions sont écrites
+  sur le plan.
+- Proposition automatique de murs :
+  - elle retient les traits nettement plus épais que les traits fins de la page (seuil
+    = max(2 × premier quartile, 60 % du trait le plus épais)) et fusionne les traits colinéaires ;
+  - elle est toujours 🟠 tant qu’elle n’est pas validée, avec l’avertissement qu’un mur dessiné en
+    double trait peut être compté deux fois.
+
+### 5.6 Du métré au DQE (§11, §12) — phase 3 🚧
+- ✅ Une mesure peut devenir la quantité d’une ligne de DQE (`{M:id}`, unités compatibles seulement).
+  Le lien est vivant : la ligne suit la mesure, son étalonnage et ses déductions. Si la mesure est
+  supprimée, la ligne garde sa dernière valeur, marquée 🟠.
+- À faire : un catalogue d’ouvrages (`WorkTemplate` : code, désignation, unité, lot, règle de métré
+  associée, prix par défaut tiré de la bibliothèque) pour générer des lignes de DQE liées à leurs
+  mesures.
 - Les lignes créées à la main ou importées restent possibles.
 
 ### 5.7 Estimation, prix, contrôles ✅
@@ -251,8 +276,8 @@ Application ──(données minimisées, consentement)──▶ Passerelle DQP �
 - **Zone centrale**, avec plusieurs visionneuses :
   - tableau (DQE ✅, prix ✅) ;
   - rapport ✅ ;
-  - aperçu du plan PDF 🚧 ;
-  - plan 2D vectoriel (P3/P4) ;
+  - aperçu du plan PDF ✅, avec outils de métré (étalonner, longueur, surface, mur, comptage) ✅ ;
+  - plan 2D vectoriel IFC/DXF (P4) ;
   - maquette IFC (P4).
 - Chaque élément affiché peut être ouvert pour voir sa source, son calcul et son historique.
 
@@ -284,7 +309,7 @@ Application ──(données minimisées, consentement)──▶ Passerelle DQP �
 |---|---|---|---|
 | 1 Core ✅ | projets, import Excel/CSV, DQE, estimation, prix, exports, sauvegarde, installateur | DQE SENOU importé et contrôlé ; exports ouverts dans Excel et un lecteur PDF | DQE SENOU ✅ |
 | 2 Analyse de fichiers 🚧 | PDF : texte, pièces, surfaces, niveaux, cartouche, équipements ; aperçu ; validation ; croisement PDF/DQE ; puis OCR | pièces et surfaces d’un plan réel retrouvées avec leur source ; différences PDF/DQE signalées | **plans PDF d’architecte réels** (idéalement ceux de SENOU) |
-| 3 Métré intelligent | géométrie PDF à l’échelle, murs, ouvertures, surfaces, volumes, catalogue d’ouvrages, DQE généré | métré d’un plan réel comparé au DQE manuel, écarts expliqués | plans + DQE du même projet |
+| 3 Métré intelligent 🚧 | géométrie PDF à l’échelle, murs, ouvertures, surfaces, volumes, catalogue d’ouvrages, DQE généré | métré d’un plan réel comparé au DQE manuel, écarts expliqués | plans + DQE du même projet |
 | 4 BIM/CAO | DXF, IFC, aperçu 2D/3D ; DWG si la licence est acquise | éléments IFC = éléments Revit/Archicad exportés | exports IFC/DXF réels |
 | 5 Plans techniques | propositions électricité, plomberie, fondation, masse ; export DXF/PDF | proposition éditable et validée par un professionnel | — |
 | 6 Engineering | modules béton armé avec notes de calcul | résultats conformes aux exemples de référence | référentiel choisi |

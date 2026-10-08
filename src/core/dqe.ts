@@ -3,6 +3,7 @@
 
 import { evaluate, FormulaError, referencedLines } from './formula';
 import { formatNumber } from './format';
+import { computeMeasure } from './metre/measure';
 import type { Confidence, DqeLine, DqeSection, Lot, Project } from './types';
 
 export interface LineResult {
@@ -84,8 +85,17 @@ export function computeProject(project: Project): ProjectResult {
           steps.push(`Quantité de « ${ref.designation} » = ${formatNumber(r.value)} ${ref.unit}`);
           return r.value;
         },
+        measure: (id) => {
+          const m = (project.measurements ?? []).find((x) => x.id === id);
+          if (!m) throw new FormulaError('Mesure référencée supprimée');
+          const r = computeMeasure(project, m);
+          if (r.status !== 'confirmed') status = 'to_verify';
+          if (r.value === null) status = 'undetermined';
+          steps.push(`Mesure « ${m.label} » (${m.fileName}, page ${m.page}) :`, ...r.steps.map((x) => `  ${x}`));
+          return r.value;
+        },
       });
-      steps.push(`Formule : ${describeExpression(q.expression, byId)} = ${formatNumber(value)}`);
+      if (!/^\{M:[^}]+\}$/.test(q.expression)) steps.push(`Formule : ${describeExpression(q.expression, byId, project)} = ${formatNumber(value)}`);
       return { value, steps, status };
     } catch (e) {
       return { value: null, steps: [], status: 'undetermined', error: (e as Error).message };
@@ -163,11 +173,18 @@ export function worstOf(...states: Confidence[]): Confidence {
   return 'confirmed';
 }
 
-export function describeExpression(expression: string, byId: Map<string, DqeLine>): string {
-  return expression.replace(/\{L:([^}]+)\}/g, (_, id: string) => {
-    const l = byId.get(id);
-    return l ? `[${l.number ? 'N° ' + l.number + ' ' : ''}${l.designation}]` : '[ligne supprimée]';
-  }).replace(/\*/g, ' × ').replace(/\//g, ' ÷ ');
+export function describeExpression(expression: string, byId: Map<string, DqeLine>, project?: Pick<Project, 'measurements'>): string {
+  return expression
+    .replace(/\{L:([^}]+)\}/g, (_, id: string) => {
+      const l = byId.get(id);
+      return l ? `[${l.number ? 'N° ' + l.number + ' ' : ''}${l.designation}]` : '[ligne supprimée]';
+    })
+    .replace(/\{M:([^}]+)\}/g, (_, id: string) => {
+      const m = project?.measurements?.find((x) => x.id === id);
+      return m ? `[mesure « ${m.label} », ${m.fileName} p.${m.page}]` : '[mesure]';
+    })
+    .replace(/\*/g, ' × ')
+    .replace(/\//g, ' ÷ ');
 }
 
 /** Lignes dont la quantité dépend de la ligne donnée. */

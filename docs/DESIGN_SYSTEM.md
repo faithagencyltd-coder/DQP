@@ -59,8 +59,8 @@ style les lisent directement : une seule source de vérité.
 ```
 ds/          design system (jetons, composants, graphiques, panneaux)
 layouts/     coquille : Sidebar (repliable, info-bulles), Topbar, nav.ts (définition unique des modules)
-features/    briques transverses : search (Ctrl+K), import (progression d’analyse), plan (visionneuse 2D,
-             inspecteur d’élément), workspace (en-tête projet, confiance), help
+features/    briques transverses : search (Ctrl+K), import (étapes d’analyse), plan (visionneuse 2D,
+             inspecteur d’élément, outils de métré), workspace (en-tête projet, confiance), help
 pages/       un écran par module, chargé à la demande (React.lazy + Suspense + squelette)
 services/    accès disque/bureau (api), exports, pdf.js, analyses (worker)
 stores/      état de l’application (projet, annuler/rétablir, sauvegarde automatique, notifications)
@@ -74,6 +74,34 @@ hooks/       useLocalState, useHotkey, useMediaQuery, useVirtual
 
 Viennent ensuite les onglets : Vue d’ensemble, Modèle 3D, Plan 2D, Analyse, Détection, Métré,
 Quantitatif, DQE, Estimation, Documents.
+
+**Plan 2D et métré.**
+- La visionneuse (`features/plan/PlanCanvas.tsx`) dessine les éléments détectés et un calque SVG de
+  mesures, dans le repère de la page (points PDF).
+- Les outils (`features/plan/MeasureTools.tsx`) sont : Sélection, Étalonner, Longueur, Surface, Mur,
+  Comptage, et la proposition de murs.
+- Saisie des points :
+  - aimantation sur les extrémités des tracés (pastille verte) ;
+  - Maj pour un trait horizontal ou vertical ;
+  - double-clic ou Entrée pour terminer, Retour arrière pour retirer un point, Échap pour annuler.
+- La pastille d’échelle de la barre d’outils prend la couleur de sa confiance.
+- Le panneau « Mesures » montre la formule de chaque mesure. On y modifie la hauteur et les
+  ouvertures, et on lie la mesure à une ligne du DQE.
+- Le Métré liste toutes les mesures des plans.
+
+**Import multiple.**
+- La file d’import accepte plusieurs fichiers par glisser-déposer ou par le sélecteur. Pour chaque
+  fichier, elle montre le format, la taille, l’état, la progression réelle (étapes dépliables), le
+  résultat, les erreurs, et signale un fichier déjà importé (même nom, même taille).
+- Les fichiers sont analysés l’un après l’autre. L’aperçu de chacun s’ouvre dès qu’il est prêt ;
+  « Plus tard » le laisse dans la file.
+- Un bouton importe d’un coup tous les fichiers prêts.
+- Les formats sans moteur sont signalés tout de suite et peuvent être joints au projet sans analyse.
+
+**Couches CSS.**
+- L’ordre des couches est `theme`, `base`, `components` (anciennes feuilles), `utilities`.
+- Aucune règle de style d’élément ne doit rester hors couche : elle l’emporterait sur les classes
+  utilitaires.
 
 **Performance.**
 - Découpage du code : chaque écran, ExcelJS et pdf.js sont chargés à la demande.

@@ -4,6 +4,7 @@ import {
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { dependentLines, describeExpression, findLine, groupSections, worstOf } from '../../core/dqe';
 import { formatMoney, formatNumber } from '../../core/format';
+import { referencedMeasures } from '../../core/formula';
 import { findMatches } from '../../core/prices';
 import {
   addLine, addLot, addSection, applyPrice, deleteLine, deleteLot, deleteSection, duplicateLine, editLine, FIELD_LABEL,
@@ -442,10 +443,13 @@ function LineDetail({ lineId, onClose }: { lineId: string; onClose: () => void }
           <dt>Quantité</dt><dd><b>{formatNumber(r.quantity)} {line.unit}</b> <StatusBadge status={r.quantityStatus} /></dd>
           <dt>Source</dt><dd>{src(line.quantity)}</dd>
           {line.quantity.source?.formula && <><dt>Formule source</dt><dd className="mono">{line.quantity.source.formula}</dd></>}
-          {line.quantity.expression && <><dt>Liée à</dt><dd>{describeExpression(line.quantity.expression, byId)}</dd></>}
+          {line.quantity.expression && <><dt>Liée à</dt><dd>{describeExpression(line.quantity.expression, byId, s.project!)}</dd></>}
           {line.quantity.note && <><dt>Remarque</dt><dd>{line.quantity.note}</dd></>}
         </dl>
         <div className="row" style={{ marginTop: 6 }}>
+          {referencedMeasures(line.quantity.expression ?? '').slice(0, 1).map((mid) => (
+            <button key={mid} className="btn sm" onClick={() => s.go('viewer', mid)}>Voir la mesure sur le plan</button>
+          ))}
           {line.quantity.expression && (
             <button className="btn sm" onClick={() => s.update((x) => unlinkQuantity(x, lineId, r.quantity))}><Unlink size={12} />Détacher la formule</button>
           )}

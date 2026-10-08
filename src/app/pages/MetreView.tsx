@@ -1,13 +1,15 @@
 // Métré (§9, §10) : chaque quantité avec sa formule, sa source et sa confiance.
 // La formule se déplie pour montrer le calcul pas à pas. Liste virtualisée.
 
-import { ChevronDown, ChevronRight, Ruler, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, Map as MapIcon, Ruler, Search } from 'lucide-react';
 import { Fragment, useMemo, useRef, useState } from 'react';
-import { describeExpression } from '../../core/dqe';
+import { allLines, describeExpression } from '../../core/dqe';
+import { computeMeasure, MEASURE_LABEL, scaleFor } from '../../core/metre/measure';
 import { formatNumber, normalizeText } from '../../core/format';
 import type { Confidence } from '../../core/types';
 import { StatusBadge } from '../ds/legacy';
-import { Card, cx, Pending } from '../ds/primitives';
+import { Button, Card, cx, EmptyState } from '../ds/primitives';
+import { KIND_COLOR } from '../features/plan/MeasureTools';
 import { useVirtual } from '../hooks';
 import { useStore } from '../stores/app-store';
 
@@ -40,20 +42,13 @@ export function MetreView() {
   const total = unit ? rows.reduce((t, x) => t + (x.rr.retained ?? 0), 0) : null;
 
   const formula = (line: (typeof rows)[number]['line']) =>
-    line.quantity.expression ? describeExpression(line.quantity.expression, byId) : line.quantity.source?.formula ? `Formule du fichier : ${line.quantity.source.formula}` : line.quantity.origin === 'manual' ? 'Saisie manuelle' : line.quantity.value === null ? '—' : 'Valeur lue';
+    line.quantity.expression ? describeExpression(line.quantity.expression, byId, p) : line.quantity.source?.formula ? `Formule du fichier : ${line.quantity.source.formula}` : line.quantity.origin === 'manual' ? 'Saisie manuelle' : line.quantity.value === null ? '—' : 'Valeur lue';
   const source = (line: (typeof rows)[number]['line']) =>
     line.quantity.source ? `${line.quantity.source.cell ? line.quantity.source.cell + ' · ' : ''}${line.quantity.source.fileName}` : line.quantity.origin === 'manual' ? 'Saisie' : '—';
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_380px]">
-        <div className="notice m-0">
-          <b>Métré issu des fichiers</b>
-          Les quantités viennent du DQE importé ou des saisies, avec leurs formules : par exemple, les enduits valent la surface des murs × 2,2, et suivent les
-          corrections. Le métré géométrique à partir des plans (longueur × hauteur − ouvertures) arrivera avec la phase 3.
-        </div>
-        <Pending compact title="Métré géométrique des plans" phase="phase 3" icon={<Ruler size={22} />}>Murs, ouvertures, surfaces et volumes calculés à l’échelle à partir des tracés des plans.</Pending>
-      </div>
+      <PlanMeasures />
 
       <Card
         bodyClass="p-0"
@@ -131,5 +126,71 @@ export function MetreView() {
         </div>
       </Card>
     </div>
+  );
+}
+
+/** Mesures prises sur les plans : formule, échelle, confiance et lignes du DQE alimentées. */
+function PlanMeasures() {
+  const s = useStore();
+  const p = s.project!;
+  const [open, setOpen] = useState<string | null>(null);
+  const lines = useMemo(() => allLines(p), [p]);
+  const hasPdf = p.sourceFiles.some((f) => f.kind === 'pdf');
+  if (!p.measurements.length) {
+    return (
+      <Card title="Mesures sur plans">
+        <EmptyState
+          icon={<Ruler size={22} />}
+          title="Aucune mesure prise sur les plans"
+          action={hasPdf ? <Button variant="primary" icon={<MapIcon size={14} />} onClick={() => s.go('viewer')}>Mesurer sur le Plan 2D</Button> : <Button onClick={() => s.go('import')}>Importer un plan PDF</Button>}
+        >
+          Dans le Plan 2D : étalonnez la planche sur une cote connue, puis mesurez longueurs, surfaces, murs (longueur × hauteur − ouvertures) et comptages.
+          Chaque mesure peut devenir la quantité d’une ligne du DQE, qui suit ensuite ses modifications.
+        </EmptyState>
+      </Card>
+    );
+  }
+  return (
+    <Card bodyClass="p-0" title={`Mesures sur plans (${p.measurements.length})`} actions={<Button size="sm" icon={<MapIcon size={13} />} onClick={() => s.go('viewer')}>Plan 2D</Button>}>
+      <table className="t">
+        <thead>
+          <tr><th className="w-6" /><th>Mesure</th><th>Type</th><th>Plan</th><th>Échelle</th><th className="n">Valeur</th><th>Unité</th><th>Confiance</th><th>Lignes du DQE</th><th className="w-8" /></tr>
+        </thead>
+        <tbody>
+          {p.measurements.map((m) => {
+            const r = computeMeasure(p, m);
+            const sc = scaleFor(p, m.fileId, m.page);
+            const linked = lines.filter((l) => l.quantity.expression?.includes(`{M:${m.id}}`));
+            return (
+              <Fragment key={m.id}>
+                <tr className="cursor-pointer hover:bg-hover" onClick={() => setOpen(open === m.id ? null : m.id)}>
+                  <td>{open === m.id ? <ChevronDown size={13} /> : <ChevronRight size={13} />}</td>
+                  <td><span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-[3px] align-middle" style={{ background: KIND_COLOR[m.kind] }} /><b>{m.label}</b></td>
+                  <td>{MEASURE_LABEL[m.kind]}{m.origin === 'proposal' ? (m.accepted ? ' (proposition validée)' : ' (proposition)') : ''}</td>
+                  <td className="text-muted">{m.fileName} · p.{m.page}</td>
+                  <td className="text-muted">{m.kind === 'count' ? '—' : sc ? `1/${Math.round(sc.mmPerPt / (25.4 / 72))}${sc.status === 'confirmed' ? ' étalonnée' : ' lue'}` : 'non déterminée'}</td>
+                  <td className="n"><b>{r.value === null ? '—' : formatNumber(r.value)}</b></td>
+                  <td>{r.unit}</td>
+                  <td><StatusBadge status={r.status} /></td>
+                  <td className="text-muted">{linked.length ? linked.map((l) => l.designation).join(' ; ') : '—'}</td>
+                  <td>
+                    <button className="icon-btn" title="Ouvrir sur le plan" aria-label="Ouvrir sur le plan" onClick={(e) => { e.stopPropagation(); s.go('viewer', m.id); }}><ExternalLink size={13} /></button>
+                  </td>
+                </tr>
+                {open === m.id && (
+                  <tr>
+                    <td />
+                    <td colSpan={9}>
+                      <ol className="steps small my-1">{r.steps.map((x, i) => <li key={i}>{x}</li>)}</ol>
+                      {m.note && <p className="small muted m-0">{m.note}</p>}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </Card>
   );
 }
