@@ -39,13 +39,19 @@ jobs:
           name: DQP-Setup-windows
           path: release/DQP-Setup-*.exe
           if-no-files-found: error
-      # Sur une étiquette v* : l'installateur est publié dans « Releases » (téléchargement direct).
+      # Sur la branche main : si la version de package.json n'est pas encore publiée,
+      # GitHub crée l'étiquette vX.Y.Z et la version dans « Releases » (téléchargement direct).
       - name: Publier la version
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" release/DQP-Setup-*.exe \
-            --title "DQP ${GITHUB_REF_NAME#v}" \
-            --notes "Installateur Windows de DQP ${GITHUB_REF_NAME#v} (non signé : Windows peut afficher « Éditeur inconnu », cliquer sur Informations complémentaires puis Exécuter quand même)."
+          V="v$(node -p "require('./package.json').version")"
+          if gh release view "$V" >/dev/null 2>&1; then
+            echo "La version $V est déjà publiée."
+            exit 0
+          fi
+          gh release create "$V" release/DQP-Setup-*.exe --target "$GITHUB_SHA" \
+            --title "DQP ${V#v}" \
+            --notes "Installateur Windows de DQP ${V#v}. Non signé : Windows peut afficher « Windows a protégé votre ordinateur » ; cliquer sur Informations complémentaires, puis Exécuter quand même."
