@@ -8,12 +8,13 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "esModuleInterop": true,
+    "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
-    "types": ["node", "vite/client"]
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": false,
+    "types": ["vite/client", "node"],
+    "noEmit": true
   },
-  "include": ["src", "electron", "tests", "scripts/*.ts", "vite.config.ts"]
+  "include": ["src", "tests", "vite.config.ts"]
 }
