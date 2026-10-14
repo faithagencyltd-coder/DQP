@@ -93,6 +93,7 @@ export function RenderPanel({ model, plan, project, settings, onSettings, onFurn
         <Checkbox label="Textes" checked={settings.notes} onChange={(v) => set({ notes: v })} />
         <Checkbox label="Barre d’échelle" checked={settings.scaleBar} onChange={(v) => set({ scaleBar: v })} />
         <Checkbox label="Cartouche" checked={settings.titleBlock} onChange={(v) => set({ titleBlock: v })} />
+        <Checkbox label="Pelouse et clôture autour" checked={settings.garden ?? !!THEMES[settings.style].garden} onChange={(v) => set({ garden: v })} />
       </div>
       {canFurnish && model.rooms.length > 0 && (
         <Button size="sm" icon={<Sofa size={15} />} onClick={onFurnishAll}>Meubler les pièces vides (proposition)</Button>

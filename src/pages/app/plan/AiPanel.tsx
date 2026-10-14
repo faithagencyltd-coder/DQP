@@ -24,7 +24,7 @@ export function AiPanel({ model, plan, bgUrl, bgSize, settings }: { model: PlanM
   const toast = useToast();
   const qc = useQueryClient();
   const [source, setSource] = useState<PlanRender['source']>(model.walls.length || model.rooms.length ? 'rendu_fidele' : 'plan_importe');
-  const [style, setStyle] = useState<PlanRender['style']>(settings.style);
+  const [style, setStyle] = useState<PlanRender['style']>(settings.style === 'realiste' ? 'moderne' : settings.style);
   const [overlay, setOverlay] = useState(true);
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<{ url: string; render: PlanRender } | null>(null);

@@ -13,8 +13,8 @@ import {
   wallSolidSpans, wallSpanPolygon,
 } from './model';
 
-export type RenderStyle = 'moderne' | 'chaleureux' | 'luxe' | 'epure';
-type FloorKind = 'parquet' | 'carrelage' | 'carrelage_fin' | 'beton' | 'dallage' | 'gazon' | 'uni';
+export type RenderStyle = 'realiste' | 'moderne' | 'chaleureux' | 'luxe' | 'epure';
+type FloorKind = 'parquet' | 'carrelage' | 'carrelage_fin' | 'beton' | 'dallage' | 'gazon' | 'uni' | 'marbre' | 'carreau';
 
 interface FloorSpec { base: string; tones: string[]; joint: string }
 export interface Theme {
@@ -30,9 +30,42 @@ export interface Theme {
   floors: Record<FloorKind, FloorSpec>;
   palette: Palette;
   shadows: boolean;
+  /** Revêtements propres au style (sinon : correspondance par défaut). */
+  floorFor?: Partial<Record<RoomKind, FloorKind>>;
+  wallStroke?: string;
+  /** Pelouse décorative et clôture autour du bâtiment. */
+  garden?: boolean;
+  /** Titre façon « affiche » (souligné, surface habitable en couleur) plutôt que cartouche. */
+  poster?: boolean;
 }
 
 export const THEMES: Record<RenderStyle, Theme> = {
+  realiste: {
+    label: 'Réaliste', description: 'Marbre, parquet chaud, carreaux gris-bleu, murs prune, pelouse : rendu de présentation.',
+    paper: '#ffffff', wall: '#7b5a63', wallStroke: '#3f2a30', threshold: '#e9e5df', text: '#111111', textMuted: '#2f2f2f', dim: '#333333', halo: 'rgba(255,255,255,0.5)',
+    floors: {
+      parquet: { base: '#c68b52', tones: ['#c98f55', '#bd8148', '#d29b62', '#c4884f', '#b97c45', '#cc9459', '#d49e66', '#c0844b'], joint: '#7a4f2a' },
+      carrelage: { base: '#e8e6e2', tones: ['#ebe9e5', '#e3e1dc', '#e8e6e2'], joint: '#c9c5bf' },
+      carrelage_fin: { base: '#e9eef0', tones: ['#edf1f3', '#e4eaec', '#eaeff1'], joint: '#c4ccd0' },
+      beton: { base: '#a9adb1', tones: ['#a4a8ac', '#afb3b7', '#a8acb0'], joint: '#8f9397' },
+      dallage: { base: '#d8d3ca', tones: ['#dcd7ce', '#d3cec5', '#d9d4cb'], joint: '#b5afa5' },
+      gazon: { base: '#5f8f3a', tones: ['#5f8f3a', '#5a8936', '#64953e'], joint: '#4a7a2c' },
+      uni: { base: '#f2f1ef', tones: ['#f2f1ef'], joint: '#dedcd8' },
+      marbre: { base: '#f3f1ee', tones: ['#f4f2ef', '#f1efeb', '#f3f1ed'], joint: '#d9d5cf' },
+      carreau: { base: '#7f8e9b', tones: ['#7f8e9b', '#788796', '#7b8a98', '#83929f'], joint: '#a9b4bd' },
+    },
+    floorFor: {
+      sejour: 'marbre', salon: 'marbre', salle_manger: 'marbre', terrasse: 'marbre', circulation: 'carreau', cuisine: 'carreau',
+      sdb: 'carreau', wc: 'carreau', buanderie: 'carreau', magasin: 'carreau', chambre: 'parquet', bureau: 'parquet', garage: 'beton', jardin: 'gazon',
+    },
+    palette: {
+      id: 'realiste', wood: '#a87b52', woodDark: '#5b4033', fabric: '#d6d4cf', fabricDark: '#b9b6b0', cushion: '#f6f5f2', linen: '#fafaf8', white: '#ffffff',
+      metal: '#c8cbce', plant: '#4e8a3a', plantDark: '#2f6328', glass: '#b9d3e0', line: '#3d3d3d', car: '#d0d3d6', rug: '#cfc9c0', accent: '#8f8f8f', accent2: '#b78a62', stone: '#ecebe8',
+    },
+    shadows: true,
+    garden: true,
+    poster: true,
+  },
   moderne: {
     label: 'Moderne', description: 'Chêne clair, carrelage gris perle, murs anthracite.',
     paper: '#ffffff', wall: '#24272b', threshold: '#d9d4cc', text: '#1d2125', textMuted: '#4b525a', dim: '#3c4248', halo: '#ffffff',
@@ -44,6 +77,8 @@ export const THEMES: Record<RenderStyle, Theme> = {
       dallage: { base: '#cfc8bb', tones: ['#d5cec1', '#c8c1b4', '#d2cbbe', '#c4bdb0'], joint: '#a9a294' },
       gazon: { base: '#8fb36b', tones: ['#7fa55d', '#9cc078', '#86ab63'], joint: '#6f9550' },
       uni: { base: '#efeeec', tones: ['#efeeec'], joint: '#dcdad6' },
+      marbre: { base: '#f1efeb', tones: ['#f3f1ee', '#efede9', '#f2f0ec'], joint: '#d6d2cb' },
+      carreau: { base: '#7f8e9b', tones: ['#7f8e9b', '#788796', '#7b8a98', '#83929f'], joint: '#a9b4bd' },
     },
     palette: {
       id: 'moderne', wood: '#b08a5e', woodDark: '#6e5038', fabric: '#bdb6ab', fabricDark: '#9c958a', cushion: '#ddd7cc', linen: '#f2efea', white: '#fbfbf9',
@@ -62,6 +97,8 @@ export const THEMES: Record<RenderStyle, Theme> = {
       dallage: { base: '#d3c2a8', tones: ['#d8c8ae', '#ccbba1', '#d6c5ab', '#c8b79d'], joint: '#a9987e' },
       gazon: { base: '#93ae64', tones: ['#87a358', '#a0ba70', '#8ba95e'], joint: '#738f4a' },
       uni: { base: '#f3ede4', tones: ['#f3ede4'], joint: '#e0d6c8' },
+      marbre: { base: '#f1efeb', tones: ['#f3f1ee', '#efede9', '#f2f0ec'], joint: '#d6d2cb' },
+      carreau: { base: '#7f8e9b', tones: ['#7f8e9b', '#788796', '#7b8a98', '#83929f'], joint: '#a9b4bd' },
     },
     palette: {
       id: 'chaleureux', wood: '#a06b3c', woodDark: '#5e3b20', fabric: '#c49a6c', fabricDark: '#9d7550', cushion: '#ead2b4', linen: '#f7efe3', white: '#fdfaf5',
@@ -80,6 +117,8 @@ export const THEMES: Record<RenderStyle, Theme> = {
       dallage: { base: '#bdb7ad', tones: ['#c3bdb3', '#b6b0a6', '#c0bab0', '#b2aca2'], joint: '#8f897f' },
       gazon: { base: '#7aa45a', tones: ['#6e9850', '#87b066', '#759f55'], joint: '#5e8642' },
       uni: { base: '#f4f3f1', tones: ['#f4f3f1'], joint: '#dedcd8' },
+      marbre: { base: '#f1efeb', tones: ['#f3f1ee', '#efede9', '#f2f0ec'], joint: '#d6d2cb' },
+      carreau: { base: '#7f8e9b', tones: ['#7f8e9b', '#788796', '#7b8a98', '#83929f'], joint: '#a9b4bd' },
     },
     palette: {
       id: 'luxe', wood: '#5a3b27', woodDark: '#2c1c12', fabric: '#d9d3c9', fabricDark: '#8f8577', cushion: '#efe9df', linen: '#f8f6f2', white: '#ffffff',
@@ -98,6 +137,8 @@ export const THEMES: Record<RenderStyle, Theme> = {
       dallage: { base: '#f7f7f7', tones: ['#f7f7f7'], joint: '#c4c4c4' },
       gazon: { base: '#f1f5ee', tones: ['#f1f5ee'], joint: '#c9d3c2' },
       uni: { base: '#ffffff', tones: ['#ffffff'], joint: '#dddddd' },
+      marbre: { base: '#f1efeb', tones: ['#f3f1ee', '#efede9', '#f2f0ec'], joint: '#d6d2cb' },
+      carreau: { base: '#7f8e9b', tones: ['#7f8e9b', '#788796', '#7b8a98', '#83929f'], joint: '#a9b4bd' },
     },
     palette: {
       id: 'epure', flat: true, wood: '#ffffff', woodDark: '#e6e6e6', fabric: '#ffffff', fabricDark: '#ededed', cushion: '#f5f5f5', linen: '#ffffff', white: '#ffffff',
@@ -139,12 +180,14 @@ export interface RenderOptions {
   title: TitleBlock | null;
   /** Largeur de l'image en pixels. */
   pixelWidth: number;
+  /** Pelouse décorative autour du bâtiment (par défaut : selon le style). */
+  garden?: boolean;
   /** Rendu sans aucun texte, pour servir d'entrée au rendu IA, au format imposé. */
   forAI?: { width: number; height: number };
 }
 
 export const DEFAULT_RENDER: RenderOptions = {
-  style: 'moderne', furniture: true, labels: true, areas: true, autoDims: true, manualDims: true, notes: true, scaleBar: true, title: null, pixelWidth: 2400,
+  style: 'realiste', furniture: true, labels: true, areas: true, autoDims: true, manualDims: true, notes: true, scaleBar: true, title: null, pixelWidth: 2400,
 };
 
 /** Cadre de l'image : coin haut-gauche en mètres, pixels par mètre, taille en pixels. */
@@ -208,6 +251,13 @@ function floorPattern(id: string, kind: FloorKind, spec: FloorSpec, rotate: bool
         x += len;
       }
     }
+  } else if (kind === 'marbre') {
+    // Dalles de 1,20 m ; le veinage est ajouté par le filtre f-marble2.
+    w = 2.4; h = 2.4;
+    for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) body += `<rect x="${n(i * 1.2)}" y="${n(j * 1.2)}" width="1.2" height="1.2" fill="${pick()}" stroke="${spec.joint}" stroke-width="0.006"/>`;
+  } else if (kind === 'carreau') {
+    w = 1.2; h = 1.2;
+    for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) body += `<rect x="${n(i * 0.6)}" y="${n(j * 0.6)}" width="0.6" height="0.6" fill="${pick()}" stroke="${spec.joint}" stroke-width="0.01"/>`;
   } else if (kind === 'carrelage' || kind === 'carrelage_fin' || kind === 'dallage') {
     const t = kind === 'carrelage' ? 0.6 : kind === 'carrelage_fin' ? 0.3 : 0.5;
     const grout = kind === 'dallage' ? 0.012 : 0.006;
@@ -336,6 +386,10 @@ function layout(m: PlanModel, o: RenderOptions): Layout | null {
   if (o.manualDims) for (const d of m.dims) pts.push(d.a, d.b);
   if (o.notes) for (const t of m.notes) pts.push(t.at);
   if (!pts.length) return null;
+  if ((o.garden ?? THEMES[o.style].garden) && (m.rooms.length || m.walls.length)) {
+    const b = buildingBox(m);
+    pts.push([b.minX - GARDEN_MARGIN, b.minY - GARDEN_MARGIN], [b.maxX + GARDEN_MARGIN, b.maxY + GARDEN_MARGIN]);
+  }
   const content = bboxOf(pts);
   const S = Math.max(content.maxX - content.minX, content.maxY - content.minY, 1);
   return { content, base: Math.min(0.45, Math.max(0.12, S / 55)) };
@@ -368,12 +422,13 @@ function roomLabel(r: Room, m: PlanModel, o: RenderOptions, t: Theme, base: numb
   const area = polygonArea(r.points);
   const b = bboxOf(r.points);
   const fit = Math.min(b.maxX - b.minX, b.maxY - b.minY);
-  const size = Math.min(base * 1.25, Math.max(base * 0.6, fit / 7));
+  // Style affiche : noms sobres, plus petits, sans contour (comme les plans de présentation).
+  const size = Math.min(base * 1.25, Math.max(base * 0.6, fit / 7)) * (t.poster ? 0.78 : 1);
   const [x, y] = labelSpot(r, m, o.furniture && m.layers.mobilier.visible, size);
   const approx = m.scaleVerified ? '' : '≈ ';
   let s = '';
-  const haloW = n(size * 0.22);
-  if (o.labels) s += `<text x="${n(x)}" y="${n(o.areas ? y - size * 0.15 : y + size * 0.35)}" font-family="${FONT}" font-size="${n(size)}" font-weight="600" fill="${t.text}" text-anchor="middle" paint-order="stroke" stroke="${t.halo}" stroke-width="${haloW}" stroke-opacity="0.85">${esc(r.name)}</text>`;
+  const haloW = n(size * (t.poster ? 0.12 : 0.22));
+  if (o.labels) s += `<text x="${n(x)}" y="${n(o.areas ? y - size * 0.15 : y + size * 0.35)}" font-family="${FONT}" font-size="${n(size)}" font-weight="${t.poster ? 500 : 600}" fill="${t.text}" text-anchor="middle" paint-order="stroke" stroke="${t.halo}" stroke-width="${haloW}" stroke-opacity="0.85">${esc(r.name)}</text>`;
   if (o.areas) s += `<text x="${n(x)}" y="${n(o.labels ? y + size * 0.95 : y + size * 0.35)}" font-family="${FONT}" font-size="${n(size * 0.78)}" fill="${t.textMuted}" text-anchor="middle" paint-order="stroke" stroke="${t.halo}" stroke-width="${haloW}" stroke-opacity="0.85">${approx}${esc(formatArea(area))}</text>`;
   return s;
 }
@@ -423,6 +478,18 @@ function dimsMargin(m: PlanModel, o: RenderOptions, base: number): number {
 }
 
 /** Contenu du plan (sans cadre) : sols, ombres, murs, ouvertures, mobilier. */
+const GARDEN_MARGIN = 1.6;
+
+function buildingBox(m: PlanModel): Box {
+  const pts: Pt[] = [];
+  for (const w of m.walls) {
+    const nr = mulp(wallNormal(w), w.thickness / 2);
+    pts.push(add(w.a, nr), sub(w.a, nr), add(w.b, nr), sub(w.b, nr));
+  }
+  for (const r of m.rooms) pts.push(...r.points);
+  return bboxOf(pts);
+}
+
 function planBody(m: PlanModel, o: RenderOptions, t: Theme, defs: string[]): string {
   const vis = m.layers;
   let s = '';
@@ -430,16 +497,25 @@ function planBody(m: PlanModel, o: RenderOptions, t: Theme, defs: string[]): str
   const floors: string[] = [];
   if (vis.pieces.visible) {
     for (const r of m.rooms) {
-      const kind = FLOOR_FOR[r.kind];
+      const kind = t.floorFor?.[r.kind] ?? FLOOR_FOR[r.kind];
       const b = bboxOf(r.points);
       const rotate = kind === 'parquet' && b.maxY - b.minY > b.maxX - b.minX;
       const pid = `f-${o.style}-${kind}-${rotate ? 'v' : 'h'}`;
       if (!defs.some((d) => d.includes(`id="${pid}"`))) defs.push(floorPattern(pid, kind, t.floors[kind], rotate));
       // Texture fine du matériau (veinage, grain du béton, herbe) ; aucune en style épuré.
-      const fx = !t.shadows ? '' : kind === 'parquet' ? (rotate ? 'f-grain-v' : 'f-grain-h') : kind === 'carrelage' && o.style === 'luxe' ? 'f-marble'
+      const fx = !t.shadows ? '' : kind === 'parquet' ? (o.style === 'realiste' ? (rotate ? 'f-wood2-v' : 'f-wood2-h') : rotate ? 'f-grain-v' : 'f-grain-h')
+        : kind === 'marbre' ? 'f-marble2' : kind === 'carreau' ? 'f-tile' : kind === 'gazon' && o.style === 'realiste' ? 'f-grass2' : kind === 'carrelage' && o.style === 'luxe' ? 'f-marble'
         : kind === 'carrelage' || kind === 'carrelage_fin' ? 'f-tile' : kind === 'beton' ? 'f-concrete' : kind === 'dallage' ? 'f-stone' : kind === 'gazon' ? 'f-grass' : '';
       floors.push(`<polygon points="${poly(r.points)}" fill="url(#${pid})"${fx ? ` filter="url(#${fx})"` : ''}/>`);
     }
+  }
+  // Pelouse décorative et clôture autour du bâtiment (style « Réaliste »).
+  if ((o.garden ?? t.garden) && (m.rooms.length || m.walls.length)) {
+    const b = buildingBox(m);
+    const g = GARDEN_MARGIN;
+    s += `<rect x="${n(b.minX - g)}" y="${n(b.minY - g)}" width="${n(b.maxX - b.minX + 2 * g)}" height="${n(b.maxY - b.minY + 2 * g)}" fill="#5f8f3a" filter="url(#f-grass2)"/>`;
+    s += `<rect x="${n(b.minX - g + 0.06)}" y="${n(b.minY - g + 0.06)}" width="${n(b.maxX - b.minX + 2 * g - 0.12)}" height="${n(b.maxY - b.minY + 2 * g - 0.12)}" fill="none" stroke="#6b6f73" stroke-width="0.09"/>`;
+    s += `<rect x="${n(b.minX - g + 0.06)}" y="${n(b.minY - g + 0.06)}" width="${n(b.maxX - b.minX + 2 * g - 0.12)}" height="${n(b.maxY - b.minY + 2 * g - 0.12)}" fill="none" stroke="#c9ccce" stroke-width="0.03"/>`;
   }
   // Ombre portée du bâtiment (effet « maquette » des plans de présentation).
   if (t.shadows && (m.rooms.length || m.walls.length)) {
@@ -470,7 +546,9 @@ function planBody(m: PlanModel, o: RenderOptions, t: Theme, defs: string[]): str
       const ext = wallEndExtensions(w, m.walls);
       return wallSolidSpans(w, vis.ouvertures.visible ? m.openings : [], ext).map(([a, b]) => `<polygon points="${poly(wallSpanPolygon(w, a, b))}"/>`).join('');
     }).join('');
-    s += `<g fill="${t.wall}" stroke="${t.wall}" stroke-width="0.004"${t.shadows ? ' filter="url(#wallshadow)"' : ''}>${walls}</g>`;
+    // Contour sombre (tracé d'abord, plus épais) puis remplissage : seul le bord extérieur reste visible.
+    if (t.wallStroke) s += `<g fill="${t.wallStroke}" stroke="${t.wallStroke}" stroke-width="0.035" stroke-linejoin="round"${t.shadows ? ' filter="url(#wallshadow)"' : ''}>${walls}</g>`;
+    s += `<g fill="${t.wall}" stroke="${t.wall}" stroke-width="0.004"${t.shadows && !t.wallStroke ? ' filter="url(#wallshadow)"' : ''}>${walls}</g>`;
     if (vis.ouvertures.visible) {
       for (const op of m.openings) {
         const w = m.walls.find((x) => x.id === op.wallId);
@@ -491,7 +569,22 @@ function grainFilter(id: string, freq: string, lo: number, oct = 3, type = 'frac
 function filtersDefs(): string {
   return grainFilter('f-grain-h', '1.4 34', 0.8) + grainFilter('f-grain-v', '34 1.4', 0.8) + grainFilter('f-tile', '5 5', 0.92, 2) +
     grainFilter('f-concrete', '6 6', 0.8, 4) + grainFilter('f-stone', '3 3', 0.84) + grainFilter('f-grass', '22 22', 0.68, 3) +
-    grainFilter('f-marble', '0.8 1.1', 0.86, 4, 'turbulence') + textureDefs() + specialDefs() + `<linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.5"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.06"/></linearGradient>
+    grainFilter('f-marble', '0.8 1.1', 0.86, 4, 'turbulence') + grainFilter('f-wood2-h', '0.8 22', 0.68, 4) + grainFilter('f-wood2-v', '22 0.8', 0.68, 4) +
+    `<filter id="f-marble2" x="0" y="0" width="1" height="1" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">` +
+    `<feTurbulence type="turbulence" baseFrequency="0.35 0.6" numOctaves="5" seed="4" result="t"/>` +
+    `<feColorMatrix in="t" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1 0 0 0 0" result="a"/>` +
+    `<feComponentTransfer in="a" result="v"><feFuncA type="table" tableValues="0.55 0.18 0.05 0 0 0 0 0 0 0"/></feComponentTransfer>` +
+    `<feFlood flood-color="#7f7b78" result="c"/><feComposite in="c" in2="v" operator="in" result="veins"/>` +
+    `<feTurbulence type="fractalNoise" baseFrequency="2.5" numOctaves="3" seed="9" result="n"/>` +
+    `<feColorMatrix in="n" type="matrix" values="0.06 0 0 0 0.94  0.06 0 0 0 0.94  0.06 0 0 0 0.94  0 0 0 0 1" result="cloud"/>` +
+    `<feBlend in="SourceGraphic" in2="cloud" mode="multiply" result="base"/><feComposite in="veins" in2="base" operator="over" result="m"/>` +
+    `<feComposite in="m" in2="SourceAlpha" operator="in"/></filter>` +
+    `<filter id="f-grass2" x="0" y="0" width="1" height="1" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">` +
+    `<feTurbulence type="fractalNoise" baseFrequency="18" numOctaves="3" seed="2" result="f"/><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="5" result="c"/>` +
+    `<feColorMatrix in="f" type="matrix" values="0.5 0 0 0 0.6  0.5 0 0 0 0.6  0.5 0 0 0 0.6  0 0 0 0 1" result="ff"/>` +
+    `<feColorMatrix in="c" type="matrix" values="0.3 0 0 0 0.8  0.3 0 0 0 0.8  0.3 0 0 0 0.8  0 0 0 0 1" result="cc"/>` +
+    `<feBlend in="SourceGraphic" in2="ff" mode="multiply" result="a"/><feBlend in="a" in2="cc" mode="multiply" result="b"/><feComposite in="b" in2="SourceAlpha" operator="in"/></filter>` +
+    textureDefs() + specialDefs() + `<linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.5"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.06"/></linearGradient>
 <filter id="ground" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="0.22"/></filter>
 <filter id="inner" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="0.09"/></filter>
 <filter id="drop" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0.05" dy="0.08" stdDeviation="0.07" flood-color="#000" flood-opacity="0.3"/><feDropShadow dx="0.01" dy="0.015" stdDeviation="0.012" flood-color="#000" flood-opacity="0.25"/></filter>
@@ -510,7 +603,35 @@ function scaleBarSvg(x: number, y: number, base: number, t: Theme): string {
   return s;
 }
 
+/** Surface habitable : pièces hors terrasses, jardins et garages. */
+export function habitableArea(m: PlanModel): number {
+  return m.rooms.filter((r) => !['terrasse', 'jardin', 'garage'].includes(r.kind)).reduce((s, r) => s + polygonArea(r.points), 0);
+}
+
+/** Titre « affiche » : vue en plan soulignée, surface habitable mise en valeur. */
+function posterSvg(x: number, y: number, w: number, base: number, tb: TitleBlock, m: PlanModel, t: Theme): { svg: string; height: number } {
+  const name = tb.planName && !/vue en plan/i.test(tb.planName) ? ' — ' + tb.planName.toUpperCase() : '';
+  const title = `VUE EN PLAN${tb.level ? ' ' + tb.level.toUpperCase() : ''}${name}`;
+  const fs = base * 1.05;
+  const tw = title.length * fs * 0.62;
+  let s = `<text x="${n(x)}" y="${n(y + fs)}" font-family="${FONT}" font-size="${n(fs)}" font-weight="800" fill="${t.text}">${esc(title)}</text>`;
+  s += `<line x1="${n(x)}" y1="${n(y + fs * 1.25)}" x2="${n(x + Math.min(tw, w * 0.7))}" y2="${n(y + fs * 1.25)}" stroke="${t.text}" stroke-width="${n(base * 0.08)}"/>`;
+  const area = habitableArea(m);
+  if (area > 0) {
+    s += `<text x="${n(x)}" y="${n(y + fs * 2.5)}" font-family="${FONT}" font-size="${n(fs * 0.85)}" font-weight="800" fill="${t.text}">SURFACE HABITABLE : <tspan fill="#d0361f">${m.scaleVerified ? '' : '≈ '}${esc(formatArea(area))}</tspan></text>`;
+  }
+  const sub = [tb.project, tb.reference, m.scaleVerified ? null : 'Échelle non vérifiée : cotes et surfaces indicatives (≈)'].filter(Boolean).join(' · ');
+  if (sub) s += `<text x="${n(x)}" y="${n(y + fs * 3.5)}" font-family="${FONT}" font-size="${n(base * 0.6)}" fill="${t.textMuted}">${esc(sub)}</text>`;
+  const right = [tb.company, tb.date].filter(Boolean) as string[];
+  right.forEach((l, i) => {
+    s += `<text x="${n(x + w)}" y="${n(y + fs * (1 + i * 0.95))}" font-family="${FONT}" font-size="${n(i === 0 ? base * 0.8 : base * 0.6)}" font-weight="${i === 0 ? 700 : 400}" fill="${i === 0 ? t.text : t.textMuted}" text-anchor="end">${esc(l)}</text>`;
+  });
+  s += `<text x="${n(x + w)}" y="${n(y + fs * 3.5)}" font-family="${FONT}" font-size="${n(base * 0.5)}" fill="${t.textMuted}" text-anchor="end">Réalisé avec PLANORA BTP</text>`;
+  return { svg: s, height: fs * 4 };
+}
+
 function titleSvg(x: number, y: number, w: number, base: number, tb: TitleBlock, m: PlanModel, t: Theme): { svg: string; height: number } {
+  if (t.poster) return posterSvg(x, y, w, base, tb, m, t);
   const h = base * 4.2;
   const lines: string[] = [];
   const main = [tb.planName, tb.level].filter(Boolean).join(' — ');
