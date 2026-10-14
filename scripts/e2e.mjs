@@ -230,6 +230,7 @@ try {
   await page.getByText('Remise commerciale revue').waitFor();
   await page.keyboard.press('Escape');
   ok('nouvelle version 2, version 1 conservée dans l’historique');
+  const quoteUrl = page.url();
 
   // ------------------------------------------------------------ équipe et permissions
   await nav(page, 'Paramètres');
@@ -299,6 +300,143 @@ try {
   await page.reload();
   await page.getByText('Actif').first().waitFor();
   ok('l’entreprise voit son offre active');
+
+  // ------------------------------------------------------------ facturation depuis le devis
+  await page.goto(quoteUrl);
+  await page.getByRole('button', { name: 'Valider et verrouiller', exact: true }).click();
+  await page.getByRole('button', { name: 'Valider', exact: true }).click();
+  await page.getByText('verrouillée').filter({ visible: true }).first().waitFor();
+  await page.getByRole('button', { name: /Facturer ce devis/ }).click();
+  let dlg = page.getByRole('dialog');
+  await dlg.getByText('Nouvelle facture').waitFor();
+  await dlg.getByLabel('Type de facture').selectOption('acompte');
+  await dlg.getByRole('button', { name: 'Créer le brouillon', exact: true }).click();
+  await page.getByRole('button', { name: 'Émettre', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Émettre', exact: true }).click();
+  await page.getByText(/FAC-\d{4}-0001/).filter({ visible: true }).first().waitFor();
+  ok('facture d’acompte (30 %) créée depuis le devis validé puis émise : numéro FAC définitif');
+  await page.getByRole('button', { name: 'Enregistrer un paiement', exact: true }).click();
+  dlg = page.getByRole('dialog');
+  await dlg.getByLabel(/^Montant/).fill('100 000');
+  await dlg.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await page.getByText('Partiellement payée').filter({ visible: true }).first().waitFor();
+  await shot(page, '21-facture');
+  const [invPdf] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'PDF', exact: true }).click()]);
+  await invPdf.saveAs(`${OUT}/facture.pdf`);
+  if (readFileSync(`${OUT}/facture.pdf`).subarray(0, 4).toString() !== '%PDF') throw new Error('PDF de facture invalide');
+  ok('paiement partiel déclaré (100 000) : facture « partiellement payée », PDF téléchargé');
+
+  // ------------------------------------------------------------ dépenses et rentabilité du chantier
+  await nav(page, 'Dépenses');
+  await page.getByRole('button', { name: 'Nouvelle dépense', exact: true }).click();
+  dlg = page.getByRole('dialog');
+  await dlg.getByLabel('Projet').selectOption({ index: 1 });
+  await dlg.getByLabel('Libellé').fill('Location bétonnière');
+  await dlg.getByLabel('Montant HT').fill('75 000');
+  await dlg.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await page.locator('table').getByText('Location bétonnière').waitFor();
+  ok('dépense de chantier enregistrée');
+  await nav(page, 'Projets et chantiers');
+  await page.getByText('Villa R+1 Fidjrossè').filter({ visible: true }).first().click();
+  await page.getByRole('tab', { name: 'Finances' }).click();
+  await page.getByText('Facturation client').waitFor();
+  await page.getByText('75 000').filter({ visible: true }).first().waitFor();
+  await shot(page, '22-finances-chantier');
+  ok('onglet Finances du chantier : facturé, encaissé, dépenses');
+
+  // ------------------------------------------------------------ achats et stocks
+  await nav(page, 'Clients et fournisseurs');
+  await page.getByRole('tab', { name: 'Fournisseurs' }).click();
+  await page.getByRole('button', { name: 'Nouveau fournisseur', exact: true }).click();
+  await field(page, 'Nom ou raison sociale').fill('Quincaillerie du Port');
+  await field(page, 'Téléphone').fill('+229 96 44 55 66');
+  await page.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await page.getByText('Coordonnées').waitFor();
+  await nav(page, 'Stocks');
+  await page.getByRole('tab', { name: 'Dépôts' }).click();
+  for (const name of ['Magasin central', 'Conteneur Fidjrossè']) {
+    await page.getByRole('button', { name: 'Nouveau dépôt', exact: true }).click();
+    await page.getByRole('dialog').getByLabel('Nom').fill(name);
+    await page.getByRole('dialog').getByRole('button', { name: 'Enregistrer', exact: true }).click();
+    await page.locator('table').getByText(name).waitFor();
+  }
+  ok('deux dépôts créés (magasin central, conteneur de chantier)');
+
+  await nav(page, 'Achats et commandes');
+  await page.getByRole('button', { name: 'Nouvelle demande', exact: true }).click();
+  dlg = page.getByRole('dialog');
+  await dlg.getByLabel('Article de la bibliothèque').selectOption({ label: 'Ciment CPJ 35 (sac 50 kg) (sac)' });
+  await dlg.getByLabel(/^Quantité/).fill('100');
+  await dlg.getByLabel('Justification').fill('Coulage dalle haute');
+  await dlg.getByRole('button', { name: 'Envoyer', exact: true }).click();
+  await page.getByText(/DA-\d{4}-0001/).filter({ visible: true }).first().waitFor();
+  await page.getByRole('button', { name: 'Approuver', exact: true }).first().click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Approuver', exact: true }).click();
+  await page.getByText('Approuvée').filter({ visible: true }).first().waitFor();
+  await page.getByRole('checkbox', { name: /Sélectionner DA-/ }).click();
+  await page.getByLabel('Fournisseur').selectOption({ label: 'Quincaillerie du Port' });
+  await page.getByRole('button', { name: /Créer le bon de commande/ }).click();
+  await page.getByText(/BC-\d{4}-0001/).filter({ visible: true }).first().waitFor();
+  ok('demande d’achat approuvée puis transformée en bon de commande');
+  await page.getByLabel('Dépôt de livraison (entrée en stock)').selectOption({ label: 'Magasin central' });
+  await page.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await page.getByText('480 000').filter({ visible: true }).first().waitFor(); // 100 × 4 800 (prix d'achat de la bibliothèque)
+  await page.getByRole('button', { name: 'Valider', exact: true }).click();
+  await page.getByText('Validée').filter({ visible: true }).first().waitFor();
+  const [bc] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Bon de commande PDF', exact: true }).click()]);
+  await bc.saveAs(`${OUT}/bon-commande.pdf`);
+  await page.getByRole('button', { name: 'Réceptionner', exact: true }).click();
+  dlg = page.getByRole('dialog');
+  await dlg.getByLabel('Dépôt').selectOption({ label: 'Magasin central' });
+  await dlg.getByLabel(/^Reçu Ciment/).fill('60');
+  await dlg.getByRole('button', { name: 'Enregistrer la réception', exact: true }).click();
+  await page.getByText('Reçue partiellement').filter({ visible: true }).first().waitFor();
+  await shot(page, '23-commande');
+  ok('commande validée (480 000), PDF, réception partielle de 60 sacs');
+
+  await nav(page, 'Stocks');
+  await page.locator('table').getByText('60 sac').waitFor();
+  await page.getByRole('button', { name: 'Transfert', exact: true }).click();
+  dlg = page.getByRole('dialog');
+  await dlg.getByLabel('Article').selectOption({ label: 'Ciment CPJ 35 (sac 50 kg) (sac)' });
+  await dlg.getByLabel('Dépôt de départ').selectOption({ label: 'Magasin central' });
+  await dlg.getByLabel('Dépôt d’arrivée').selectOption({ label: 'Conteneur Fidjrossè' });
+  await dlg.getByLabel(/^Quantité/).fill('20');
+  await dlg.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await page.locator('table').getByText('40 sac').waitFor();
+  await page.locator('table').getByText('20 sac').waitFor();
+  ok('transfert de 20 sacs vers le conteneur : 40 + 20');
+  const conteneur = page.locator('tr', { hasText: 'Conteneur Fidjrossè' });
+  await conteneur.getByRole('button', { name: 'Sortie', exact: true }).click();
+  dlg = page.getByRole('dialog');
+  await dlg.getByLabel(/^Quantité/).fill('25');
+  await dlg.getByText('Stock insuffisant').waitFor();
+  await dlg.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await page.getByText(/Stock insuffisant : 20 disponible/).filter({ visible: true }).first().waitFor();
+  await dlg.getByLabel(/^Quantité/).fill('5');
+  await dlg.getByLabel('Chantier').selectOption({ index: 1 });
+  await dlg.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await page.locator('table').getByText('15 sac').waitFor();
+  ok('sortie refusée au-delà du stock (25 > 20), sortie de 5 sacs affectée au chantier');
+  const magasin = page.locator('tr', { hasText: 'Magasin central' });
+  await magasin.getByRole('button', { name: 'Inventaire', exact: true }).click();
+  dlg = page.getByRole('dialog');
+  await dlg.getByLabel(/^Quantité comptée/).fill('38');
+  await dlg.getByLabel(/^Motif/).fill('Deux sacs déchirés');
+  await dlg.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await page.getByText(/Écart d’inventaire enregistré : -2/).waitFor();
+  await page.locator('table').getByText('38 sac').waitFor();
+  await magasin.getByRole('button', { name: 'Seuil', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('Quantité minimale').fill('50');
+  await page.getByRole('dialog').getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await page.getByText('À réapprovisionner').filter({ visible: true }).first().waitFor();
+  await shot(page, '24-stocks');
+  ok('inventaire (écart −2 tracé avec motif) et alerte sous le minimum (38 < 50)');
+  await page.getByRole('tab', { name: 'Mouvements' }).click();
+  await page.getByText('Deux sacs déchirés').waitFor();
+  await page.getByText('Réception de commande').filter({ visible: true }).first().waitFor();
+  await shot(page, '25-mouvements');
+  ok('journal des mouvements : réception, transferts, sortie, inventaire');
 
   // ------------------------------------------------------------ plans : dessin, pièces, rendus
   await nav(page, 'Plans techniques');

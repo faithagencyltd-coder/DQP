@@ -47,6 +47,18 @@ Détail du module, des coûts et des limites : `docs/RENDU_PLANS.md`.
 | **Rendu par IA** : depuis le rendu fidèle ou le fichier importé, 4 ambiances, quota mensuel par offre (10 unités par rendu), réservation / consommation / restitution, 3 rendus simultanés au plus, état réel suivi, noms et cotes exacts posés par PLANORA, mention « illustration non contractuelle » sur toute image | ✅ Terminé côté PLANORA | 29 contrôles SQL, 9 tests de la fonction serveur, recette 30 avec un fournisseur **de test** |
 | Rendu IA avec un vrai fournisseur (OpenAI ou Google Gemini) | ⚠️ **À activer** | nécessite une clé (secret `IA_IMAGE_API_KEY`) ; pas encore essayé avec un service réel |
 
+## Finances, achats et stocks (§16 à §18)
+
+| Élément | État | Vérification |
+|---|---|---|
+| Factures depuis un devis validé : acompte (%), situation (avancement cumulé), solde (déduit les factures précédentes), facture simple ; numéro définitif FAC-AAAA-0001 attribué à l’émission ; facture émise figée, corrigée par un avoir (AVO-) | ✅ Terminé | 6 tests moteur, contrôles SQL (totaux recalculés par le serveur), recette 27 |
+| Paiements déclarés (jamais « vérifiés » automatiquement), reste à payer, statut partiel / payé, relances par WhatsApp ou e-mail tracées, échéances et factures échues | ✅ Terminé | contrôles SQL, recette 28 |
+| Dépenses par chantier et par lot : engagée / facturée / payée, justificatif privé, export CSV | ✅ Terminé | recette 29 |
+| Onglet Finances du chantier : budget initial et révisé, budget par lot, facturé, encaissé, dépenses, marge réelle et objectif, alertes de dépassement | ✅ Terminé | tests moteur, recette 30 |
+| Demandes d’achat (DA-) approuvées ou refusées selon les droits, regroupées en bon de commande | ✅ Terminé | contrôles SQL, recette 32 |
+| Bons de commande (BC-) : lignes, total recalculé par le serveur, validation puis figés, envoi, annulation, PDF ; réceptions totales ou partielles avec entrée en stock ; rapprochement avec la facture du fournisseur et création de la dépense | ✅ Terminé | 3 tests moteur, contrôles SQL, recette 33 |
+| Stocks par dépôt calculés **uniquement** à partir des mouvements ; stock négatif refusé par le serveur ; entrées, sorties affectées à un chantier, transferts, inventaires (écart tracé avec motif), ajustements motivés ; seuils minimums et alertes ; journal et exports CSV | ✅ Terminé | contrôles SQL, recette 31 et 34-37 |
+
 ## Autres fonctions livrées
 
 | Élément | État |
@@ -68,7 +80,7 @@ Détail du module, des coûts et des limites : `docs/RENDU_PLANS.md`.
 | Paiement des abonnements | Demande + activation manuelle par l’administration ; le paiement en ligne (Mobile Money, carte) attend le choix d’un prestataire. |
 | Permissions par projet | La matrice est par entreprise ; la restriction par projet viendra avec les équipes de chantier. |
 | Client externe | Rôle non encore ouvert (accès limité aux devis et rapports). |
-| Rapports | DQE, BPU, devis et métrés s’exportent ; les rapports de chantier et financiers arrivent avec la phase 5. |
+| Rapports | DQE, BPU, devis, métrés, factures, bons de commande, dépenses et stocks s’exportent ; les rapports de chantier (journaliers) arrivent avec le planning. |
 
 ## Non réalisé (signalé « bientôt » dans l’application)
 
@@ -76,6 +88,6 @@ Détail du module, des coûts et des limites : `docs/RENDU_PLANS.md`.
 |---|---|
 | Plans : comparaison de versions (§9.5), fichiers DWG (exporter en PDF) et import DXF, rotation du fond, outils de CAO avancés (arc, cercle, décalage, hachures), symboles électriques / plomberie / ventilation | Phase 3 (suite) |
 | Assistant IA, OCR (le quota IA est déjà en place) | Phase 4 |
-| Facturation et encaissements, dépenses et rentabilité, achats, stocks, planning, rapports journaliers | Phase 5 |
+| Planning, tâches, rapports journaliers avec photos, réserves | Phase 5 (suite) |
 | Notifications (application, e-mail, SMS), support | Phase 6 |
 | Mode hors ligne | Non commencé (l’application est installable sur l’écran d’accueil mais nécessite Internet) |

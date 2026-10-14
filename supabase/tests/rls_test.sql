@@ -353,6 +353,40 @@ select tests.check((select amount_ttc from public.expenses where label = 'Ciment
 select tests.fails(format('insert into public.expenses (org_id, category, label, amount_ht, status) values (%L, ''transport'', ''Camion'', 5000, ''payee'')', tests.id('org2')), 'check constraint', 'dépense payée : date de paiement obligatoire');
 select tests.fails(format('insert into public.expenses (org_id, category, label, amount_ht, receipt_path) values (%L, ''autre'', ''X'', 1, %L)', tests.id('org2'), tests.id('org1') || '/depenses/x.pdf'), 'check constraint', 'justificatif rangé chez une autre entreprise refusé');
 
+-- ------------------------------------------------------------ achats et stocks
+select tests.login('00000000-0000-0000-0000-00000000000b');
+insert into public.contacts (org_id, kind, name) values (tests.id('org2')::uuid, 'fournisseur', 'Quincaillerie Dantokpa');
+insert into public.price_items (org_id, kind, designation, unit, purchase_price) values (tests.id('org2')::uuid, 'article', 'Ciment CPJ 35', 'sac', 5200);
+insert into public.warehouses (org_id, name) values (tests.id('org2')::uuid, 'Dépôt central'), (tests.id('org2')::uuid, 'Chantier Fidjrossè');
+with x as (insert into public.purchase_requests (org_id, item_id, designation, qty, unit, status) values (tests.id('org2')::uuid, (select id from public.price_items where designation = 'Ciment CPJ 35'), 'Ciment CPJ 35', 100, 'sac', 'approuvee') returning id)
+insert into tests.ids select 'da', id from x;
+select tests.check((select status = 'soumise' and reference like 'DA-____-0001' from public.purchase_requests where id = tests.id('da')::uuid), 'demande d''achat numérotée, statut imposé « soumise »');
+select tests.fails(format('select public.order_from_requests(array[%L]::uuid[], null)', tests.id('da')), 'approuvées', 'une demande non approuvée ne se commande pas');
+select public.decide_purchase_request(tests.id('da')::uuid, true, 'OK chantier');
+insert into tests.ids values ('bc', public.order_from_requests(array[tests.id('da')::uuid], (select id from public.contacts where name = 'Quincaillerie Dantokpa')));
+select tests.check((select total_ht = 520000 and status = 'brouillon' and reference like 'BC-____-0001' from public.purchase_orders where id = tests.id('bc')::uuid), 'commande créée depuis la demande : 100 × 5 200 = 520 000 (total calculé par la base)');
+select tests.check((select status from public.purchase_requests where id = tests.id('da')::uuid) = 'commandee', 'demande passée « commandée »');
+update public.purchase_orders set lines = jsonb_set(lines, '{0,received_qty}', '100') where id = tests.id('bc')::uuid;
+select tests.check((select (lines -> 0 ->> 'received_qty')::numeric = 0 from public.purchase_orders where id = tests.id('bc')::uuid), 'le client ne déclare pas de quantités reçues sur une commande');
+select public.set_order_status(tests.id('bc')::uuid, 'validee');
+select tests.fails(format('update public.purchase_orders set lines = ''[]'' where id = %L', tests.id('bc')), 'validée', 'commande validée figée');
+select tests.fails(format('select public.receive_order(%L, %L::jsonb, null, null, null)', tests.id('bc'), '[{"line_id":"' || (select lines -> 0 ->> 'id' from public.purchase_orders where id = tests.id('bc')::uuid) || '","qty":150}]'), 'reste à recevoir', 'réception supérieure à la commande refusée');
+select public.receive_order(tests.id('bc')::uuid, ('[{"line_id":"' || (select lines -> 0 ->> 'id' from public.purchase_orders where id = tests.id('bc')::uuid) || '","qty":60}]')::jsonb, (select id from public.warehouses where name = 'Dépôt central'), null, 'Livraison 1');
+select tests.check((select status from public.purchase_orders where id = tests.id('bc')::uuid) = 'partielle', 'réception partielle');
+select tests.check((select qty from public.stock_levels where warehouse_id = (select id from public.warehouses where name = 'Dépôt central')) = 60, 'stock alimenté par la réception (60 sacs)');
+select public.receive_order(tests.id('bc')::uuid, ('[{"line_id":"' || (select lines -> 0 ->> 'id' from public.purchase_orders where id = tests.id('bc')::uuid) || '","qty":40}]')::jsonb, (select id from public.warehouses where name = 'Dépôt central'), null, null);
+select tests.check((select status from public.purchase_orders where id = tests.id('bc')::uuid) = 'recue', 'réception complète');
+insert into public.stock_movements (org_id, item_id, warehouse_id, kind, qty, project_id) values (tests.id('org2')::uuid, (select id from public.price_items where designation = 'Ciment CPJ 35'), (select id from public.warehouses where name = 'Dépôt central'), 'sortie', 30, null);
+select tests.fails(format('insert into public.stock_movements (org_id, item_id, warehouse_id, kind, qty) values (%L, %L, %L, ''sortie'', 500)', tests.id('org2'), (select id from public.price_items where designation = 'Ciment CPJ 35'), (select id from public.warehouses where name = 'Dépôt central')), 'Stock insuffisant', 'pas de stock négatif');
+select public.transfer_stock((select id from public.price_items where designation = 'Ciment CPJ 35'), (select id from public.warehouses where name = 'Dépôt central'), (select id from public.warehouses where name = 'Chantier Fidjrossè'), 20, 'Approvisionnement chantier');
+select tests.check((select string_agg(qty::text, ',' order by qty) from public.stock_levels) = '20.000,50.000', 'transfert : 50 au dépôt, 20 sur le chantier');
+select tests.check(public.count_stock((select id from public.price_items where designation = 'Ciment CPJ 35'), (select id from public.warehouses where name = 'Dépôt central'), 48, 'Sacs abîmés') = -2, 'inventaire : écart de −2 tracé');
+select tests.fails(format('insert into public.stock_movements (org_id, item_id, warehouse_id, kind, qty) values (%L, %L, %L, ''ajustement'', 1)', tests.id('org2'), (select id from public.price_items where designation = 'Ciment CPJ 35'), (select id from public.warehouses where name = 'Dépôt central')), 'check constraint', 'ajustement sans motif refusé');
+select tests.fails(format('insert into public.stock_movements (org_id, item_id, warehouse_id, kind, qty) values (%L, %L, %L, ''reception'', 1000)', tests.id('org2'), (select id from public.price_items where designation = 'Ciment CPJ 35'), (select id from public.warehouses where name = 'Dépôt central')), 'row-level security', 'une réception ne se déclare pas hors commande');
+select tests.fails('delete from public.stock_movements', 'permission denied', 'les mouvements de stock ne s''effacent pas');
+select tests.login('00000000-0000-0000-0000-00000000000a');
+select tests.check((select count(*) from public.stock_levels) = 0 and (select count(*) from public.purchase_orders) = 0, 'isolation : A ne voit ni les stocks ni les commandes de B');
+
 -- ------------------------------------------------------------ double authentification
 reset role;
 insert into auth.mfa_factors (user_id, status) values ('00000000-0000-0000-0000-00000000000b', 'verified');

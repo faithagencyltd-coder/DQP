@@ -135,3 +135,14 @@ export const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
+
+export const REQUEST_STATUS: Record<string, { label: string; tone: 'grey' | 'navy' | 'ok' | 'bad' | 'warn' }> = {
+  soumise: { label: 'À approuver', tone: 'warn' }, approuvee: { label: 'Approuvée', tone: 'ok' }, refusee: { label: 'Refusée', tone: 'bad' }, commandee: { label: 'Commandée', tone: 'navy' },
+};
+export const ORDER_STATUS: Record<string, { label: string; tone: 'grey' | 'navy' | 'ok' | 'bad' | 'warn' }> = {
+  brouillon: { label: 'Brouillon', tone: 'grey' }, validee: { label: 'Validée', tone: 'navy' }, envoyee: { label: 'Envoyée', tone: 'navy' },
+  partielle: { label: 'Reçue partiellement', tone: 'warn' }, recue: { label: 'Reçue', tone: 'ok' }, annulee: { label: 'Annulée', tone: 'grey' },
+};
+export const MOVE_KIND: Record<string, string> = {
+  entree: 'Entrée', sortie: 'Sortie (affectation chantier)', transfert: 'Transfert', inventaire: 'Inventaire', ajustement: 'Ajustement', reception: 'Réception de commande',
+};

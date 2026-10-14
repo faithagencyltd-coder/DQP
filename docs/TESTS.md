@@ -16,6 +16,9 @@ Trois niveaux de tests automatisés, plus une recette manuelle.
   zone ouverte refusée), aménagement proposé (dans la pièce, porte dégagée), rendu fidèle (noms,
   surfaces, cotes 500 / 1020, « ≈ » si l’échelle n’est pas vérifiée), image d’entrée IA sans aucun texte
   et surcouche alignée, lignes de métré (37,83 m² ; mur 8 × 2,8 − 0,9 × 2,1 = 20,51 m²), DXF.
+- `tests/finance.test.ts` et `tests/purchasing.test.ts` : acompte, situation, solde, avoir, échéances,
+  rentabilité du chantier ; total de commande, valeur reçue, rapprochement avec la facture du fournisseur,
+  alertes de réapprovisionnement.
 - `tests/rendu-ia.test.ts` : fonction serveur du rendu IA — session et propriétaire vérifiés, absence de
   clé = échec explicite et unités restituées, succès (image déposée, demande close), échec du
   fournisseur sans fuite de secret, consigne (géométrie conservée, aucun texte), format des requêtes
@@ -24,13 +27,16 @@ Trois niveaux de tests automatisés, plus une recette manuelle.
 ## 2. Sécurité et règles de la base — `sh supabase/tests/run.sh`
 
 Applique les migrations sur un PostgreSQL vierge, avec un environnement qui imite Supabase
-(`supabase/tests/shim_supabase.sql`), puis exécute `supabase/tests/rls_test.sql` : 107 contrôles, parmi lesquels :
+(`supabase/tests/shim_supabase.sql`), puis exécute `supabase/tests/rls_test.sql` : 146 contrôles, parmi lesquels :
 isolation entre entreprises (lecture, écriture, fichiers, journal), permissions par rôle et matrice
 modifiable, invitations, limites d’offre, abonnement échu en lecture seule, versions verrouillées, métré
 approuvé figé, historique des prix, demandes d’abonnement, administration sans accès au contenu,
 double authentification, plans (isolation, module selon l’offre, fichiers d’un plan soumis aux droits
 « Plans », plan approuvé figé), rendus IA (quota mensuel, réservation puis consommation ou restitution,
-seul le serveur clôt un rendu, 3 rendus simultanés au plus, demandes abandonnées restituées, journal).
+seul le serveur clôt un rendu, 3 rendus simultanés au plus, demandes abandonnées restituées, journal),
+finances (totaux recalculés par le serveur, numérotation FAC / AVO à l’émission, facture émise figée,
+paiement limité au reste dû), achats et stocks (commande validée figée, réception partielle, stock négatif
+refusé, transfert, inventaire, isolation).
 
 ```bash
 PGHOST=/chemin/socket PGPORT=5432 sh supabase/tests/run.sh   # utilisateur « postgres »
@@ -40,9 +46,12 @@ PGHOST=/chemin/socket PGPORT=5432 sh supabase/tests/run.sh   # utilisateur « po
 
 Pilote un vrai navigateur sur une pile locale (`scripts/local-stack/`) : PostgreSQL avec les migrations,
 PostgREST, et une passerelle qui joue l’authentification, le stockage et la fonction serveur de Supabase.
-35 étapes : inscription, confirmation, entreprise, client, doublon, projet et lots, article et ouvrage composé,
+47 étapes : inscription, confirmation, entreprise, client, doublon, projet et lots, article et ouvrage composé,
 métré, DQE, devis, PDF, Excel, validation, nouvelle version, invitation d’un métreur sur téléphone,
-permissions, demande d’abonnement (offre Professionnelle), activation par l’administration, puis plans :
+permissions, demande d’abonnement (offre Professionnelle), activation par l’administration ; facture
+d’acompte depuis le devis, émission, paiement partiel, PDF, dépense, onglet Finances du chantier ; dépôts,
+demande d’achat approuvée, bon de commande (480 000), réception partielle, transfert, sortie refusée au-delà
+du stock, inventaire avec écart, alerte sous le minimum, journal des mouvements ; puis plans :
 dessin (murs, cloison à la longueur saisie, porte, fenêtre), détection des pièces (26,18 m² et 32,98 m²),
 aménagement, rendu fidèle (PDF, DXF), rendu IA, métré tiré du plan, import d’un plan scanné, calibration,
 détection sur les traits de l’image, éditeur sur téléphone ; enfin tableau de bord et journal.

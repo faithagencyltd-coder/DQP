@@ -118,3 +118,24 @@ export interface Expense {
   payment_method: PaymentMethod | null; supplier_invoice_ref: string | null; receipt_path: string | null; note: string | null;
   purchase_order_id: string | null; created_at: string; updated_at: string;
 }
+
+export interface Warehouse { id: string; org_id: string; name: string; location: string | null; project_id: string | null; archived_at: string | null }
+export interface StockLevel { org_id: string; item_id: string; warehouse_id: string; qty: number; min_qty: number | null; last_move: string }
+export interface StockMovement {
+  id: string; org_id: string; item_id: string; warehouse_id: string; kind: 'entree' | 'sortie' | 'transfert' | 'inventaire' | 'ajustement' | 'reception';
+  qty: number; unit_cost: number | null; project_id: string | null; lot: string | null; order_id: string | null; reason: string | null; moved_on: string;
+  created_by: string | null; created_at: string;
+}
+export interface PurchaseRequest {
+  id: string; org_id: string; reference: string; project_id: string | null; lot: string | null; item_id: string | null; designation: string; qty: number; unit: string;
+  needed_by: string | null; supplier_id: string | null; justification: string | null; status: 'soumise' | 'approuvee' | 'refusee' | 'commandee';
+  decision_note: string | null; decided_at: string | null; order_id: string | null; requested_by: string | null; created_at: string;
+}
+export interface OrderLine { id: string; item_id?: string | null; designation: string; unit: string; qty: number | null; unit_price: number | null; received_qty?: number; request_id?: string }
+export interface PurchaseOrder {
+  id: string; org_id: string; reference: string; supplier_id: string | null; project_id: string | null; warehouse_id: string | null;
+  status: 'brouillon' | 'validee' | 'envoyee' | 'partielle' | 'recue' | 'annulee'; order_date: string; expected_date: string | null; lines: OrderLine[];
+  currency: string; total_ht: number; notes: string | null; supplier_invoice_ref: string | null; supplier_invoice_amount: number | null;
+  validated_at: string | null; created_at: string; updated_at: string;
+}
+export interface PurchaseReceipt { id: string; order_id: string; received_on: string; warehouse_id: string | null; lines: { line_id: string; qty: number }[]; note: string | null; created_at: string }
