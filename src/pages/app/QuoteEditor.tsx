@@ -17,7 +17,7 @@ import { priceAge } from './Prices';
 
 const KIND_LABEL = { dqe: 'DQE', bpu: 'BPU', devis: 'Devis' };
 
-function Num({ value, onChange, disabled, label, decimals = 3, wide, boxed }: { value: number | null; onChange: (v: number | null) => void; disabled?: boolean; label: string; decimals?: number; wide?: boolean; boxed?: boolean }) {
+export function Num({ value, onChange, disabled, label, decimals = 3, wide, boxed }: { value: number | null; onChange: (v: number | null) => void; disabled?: boolean; label: string; decimals?: number; wide?: boolean; boxed?: boolean }) {
   const show = (v: number | null) => (v === null ? '' : formatNumber(v, decimals).replace(/ /g, ' '));
   const [txt, setTxt] = useState(show(value));
   const [focus, setFocus] = useState(false);
@@ -302,7 +302,8 @@ export function QuoteEditor() {
                   <Allowed module="devis" action="modifier"><Button size="sm" onClick={() => setStatus.mutate({ status: 'expire' })}>Expiré</Button></Allowed>
                   <Allowed module="devis" action="modifier"><Button size="sm" onClick={() => setStatus.mutate({ status: 'annule' })}>Annulé</Button></Allowed>
                 </div>
-                <p className="pt-1 text-[11.5px] text-faint">« Préparer un e-mail » ouvre votre messagerie : joignez le PDF téléchargé. L’envoi direct depuis PLANORA et la conversion en facture arriveront avec les modules Notifications et Facturation.</p>
+                {(doc.status === 'accepte' || doc.locked) && <Allowed module="factures" action="creer"><Button size="sm" variant="primary" className="w-full" onClick={() => nav(`/app/factures?devis=${doc.id}`)}>Facturer ce devis (acompte, situation, solde)</Button></Allowed>}
+                <p className="pt-1 text-[11.5px] text-faint">« Préparer un e-mail » ouvre votre messagerie : joignez le PDF téléchargé.</p>
               </div>
             </Card>
           )}
@@ -344,10 +345,10 @@ export function QuoteEditor() {
   );
 }
 
-function LotRows({ lot, lotIndex, editable, isBpu, result, currency, onRename, onMoveLot, onDeleteLot, onLine, onMoveLine, onDeleteLine, onAdd, onPick }: {
+export function LotRows({ lot, lotIndex, editable, isBpu, result, currency, onRename, onMoveLot, onDeleteLot, onLine, onMoveLine, onDeleteLine, onAdd, onPick }: {
   lot: DocBody['lots'][number]; lotIndex: number; editable: boolean; isBpu: boolean; result: ReturnType<typeof computeDoc>; currency: string;
   onRename: (n: string) => void; onMoveLot: (d: -1 | 1) => void; onDeleteLot: () => void; onLine: (id: string, p: Partial<DocLine>) => void;
-  onMoveLine: (id: string, d: -1 | 1) => void; onDeleteLine: (id: string) => void; onAdd: (k: 'ouvrage' | 'titre') => void; onPick: (id: string) => void;
+  onMoveLine: (id: string, d: -1 | 1) => void; onDeleteLine: (id: string) => void; onAdd: (k: 'ouvrage' | 'titre') => void; onPick?: (id: string) => void;
 }) {
   const [confirmDel, setConfirmDel] = useState(false);
   const lr = result.lots[lotIndex];
@@ -394,7 +395,7 @@ function LotRows({ lot, lotIndex, editable, isBpu, result, currency, onRename, o
             <td className="px-1 py-1 text-right"><Num label="Prix unitaire" wide value={l.unitPrice} decimals={2} disabled={!editable} onChange={(v) => onLine(l.id, { unitPrice: v, priceSource: v === l.unitPrice ? l.priceSource : { kind: 'saisie' } })} /></td>
             {!isBpu && <td className="tabular px-2 py-2 text-right font-semibold text-navy-900">{r?.amount === null ? <span className="text-[12px] text-warn-600">à compléter</span> : formatMoney(r?.amount, currency, false)}</td>}
             <td className="whitespace-nowrap px-1 py-1 text-right">
-              {editable && <button aria-label="Choisir un prix dans la bibliothèque" title="Choisir un prix dans la bibliothèque" className="p-1 text-faint hover:text-signal-600" onClick={() => onPick(l.id)}><Search size={14} /></button>}
+              {editable && onPick && <button aria-label="Choisir un prix dans la bibliothèque" title="Choisir un prix dans la bibliothèque" className="p-1 text-faint hover:text-signal-600" onClick={() => onPick(l.id)}><Search size={14} /></button>}
               {editable && <LineActions onMove={(d) => onMoveLine(l.id, d)} onDelete={() => onDeleteLine(l.id)} />}
             </td>
           </tr>

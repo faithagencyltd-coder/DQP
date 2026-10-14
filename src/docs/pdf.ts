@@ -11,11 +11,11 @@ import { computeMetre, FORMULAS } from '../engine/metre';
 import { COUNTRIES, CLIENT_TYPES } from '../lib/labels';
 import type { Contact, MetreDoc, Organization, Project, Quote } from '../lib/types';
 
-const NAVY: [number, number, number] = [15, 31, 56];
-const SIGNAL: [number, number, number] = [242, 106, 27];
-const MUTED: [number, number, number] = [102, 112, 133];
-const LINE: [number, number, number] = [227, 232, 239];
-const M = 14; // marge (mm)
+export const NAVY: [number, number, number] = [15, 31, 56];
+export const SIGNAL: [number, number, number] = [242, 106, 27];
+export const MUTED: [number, number, number] = [102, 112, 133];
+export const LINE: [number, number, number] = [227, 232, 239];
+export const M = 14; // marge (mm)
 
 /** Le PDF utilise l'encodage WinAnsi : on remplace les rares caractères hors de cet alphabet. */
 export function pdfText(s: string | null | undefined): string {
@@ -36,9 +36,9 @@ export interface PdfContext {
 }
 
 const t = pdfText;
-const money = (v: number | null | undefined, cur: string) => t(formatMoney(v, cur, false));
+export const money = (v: number | null | undefined, cur: string) => t(formatMoney(v, cur, false));
 
-function header(doc: jsPDF, ctx: PdfContext, title: string, meta: [string, string][]) {
+export function header(doc: jsPDF, ctx: PdfContext, title: string, meta: [string, string][]) {
   const W = doc.internal.pageSize.getWidth();
   let y = M;
   // Bandeau de l'entreprise (logo ou nom)
@@ -67,7 +67,7 @@ function header(doc: jsPDF, ctx: PdfContext, title: string, meta: [string, strin
   return y + 5;
 }
 
-function partyBlocks(doc: jsPDF, ctx: PdfContext, y: number) {
+export function partyBlocks(doc: jsPDF, ctx: PdfContext, y: number) {
   const W = doc.internal.pageSize.getWidth();
   const half = (W - 2 * M - 6) / 2;
   const box = (x: number, label: string, lines: string[]) => {
@@ -84,7 +84,7 @@ function partyBlocks(doc: jsPDF, ctx: PdfContext, y: number) {
   return y + Math.max(h1, h2) + 6;
 }
 
-function footer(doc: jsPDF, ctx: PdfContext, label: string) {
+export function footer(doc: jsPDF, ctx: PdfContext, label: string) {
   const n = doc.getNumberOfPages();
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
@@ -100,7 +100,7 @@ function footer(doc: jsPDF, ctx: PdfContext, label: string) {
   }
 }
 
-function ensureSpace(doc: jsPDF, y: number, need: number) {
+export function ensureSpace(doc: jsPDF, y: number, need: number) {
   const H = doc.internal.pageSize.getHeight();
   if (y + need > H - 20) {
     doc.addPage();
@@ -109,7 +109,7 @@ function ensureSpace(doc: jsPDF, y: number, need: number) {
   return y;
 }
 
-const lastY = (doc: jsPDF) => (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+export const lastY = (doc: jsPDF) => (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
 
 // ------------------------------------------------------------------ DQE et devis
 export function buildQuotePdf(q: Quote, ctx: PdfContext): jsPDF {

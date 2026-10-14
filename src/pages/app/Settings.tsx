@@ -56,6 +56,7 @@ function CompanySettings() {
       name: f!.name.trim(), legal_name: f!.legal_name || null, country: f!.country, currency: f!.currency, city: f!.city || null, address: f!.address || null,
       phone: f!.phone || null, email: f!.email || null, website: f!.website || null, legal_ids: f!.legal_ids.filter((x) => x.label.trim()),
       bank_details: f!.bank_details || null, default_taxes: f!.default_taxes, quote_validity_days: f!.quote_validity_days, payment_terms: f!.payment_terms,
+      payment_days: f!.payment_days ?? 30, reminder_before_days: f!.reminder_before_days ?? 7, reminder_every_days: f!.reminder_every_days ?? 15,
       quote_footer: f!.quote_footer || null, metre_rules: f!.metre_rules, pricing_method: f!.pricing_method,
     }).eq('id', f!.id);
     if (error) throw new Error(errorMessage(error));
@@ -122,6 +123,9 @@ function CompanySettings() {
           <Field label="Devise"><Select disabled={!editable} value={f.currency} onChange={set('currency')}>{Object.values(CURRENCIES).map((c) => <option key={c.code} value={c.code}>{c.label} ({c.symbol})</option>)}</Select></Field>
           <Field label="Validité des devis (jours)"><Input disabled={!editable} type="number" min={1} max={365} value={f.quote_validity_days} onChange={(e) => setF({ ...f, quote_validity_days: Number(e.target.value) || 30 })} /></Field>
           <Field label="Conditions de paiement par défaut" className="sm:col-span-2"><Input disabled={!editable} value={f.payment_terms} onChange={set('payment_terms')} /></Field>
+          <Field label="Délai de paiement des factures (jours)"><Input disabled={!editable} type="number" min={0} max={365} value={f.payment_days ?? 30} onChange={(e) => setF({ ...f, payment_days: Number(e.target.value) || 0 })} /></Field>
+          <Field label="Alerte d’échéance (jours avant)"><Input disabled={!editable} type="number" min={0} max={90} value={f.reminder_before_days ?? 7} onChange={(e) => setF({ ...f, reminder_before_days: Number(e.target.value) || 0 })} /></Field>
+          <Field label="Rappel des factures échues (tous les … jours)"><Input disabled={!editable} type="number" min={1} max={180} value={f.reminder_every_days ?? 15} onChange={(e) => setF({ ...f, reminder_every_days: Number(e.target.value) || 15 })} /></Field>
           <Field label="Mention de pied de page" className="sm:col-span-2"><Input disabled={!editable} value={f.quote_footer ?? ''} onChange={set('quote_footer')} placeholder="Ex. Merci de votre confiance" /></Field>
           <div className="sm:col-span-2">
             <div className="mb-1.5 text-[13px] font-semibold text-ink-2">Taxes appliquées par défaut aux nouveaux devis</div>

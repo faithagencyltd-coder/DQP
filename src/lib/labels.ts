@@ -106,3 +106,32 @@ export const COUNTRIES: Record<string, string> = {
 export const fmtDate = (d: string | null | undefined) => (d ? new Date(d.length === 10 ? d + 'T00:00:00' : d).toLocaleDateString('fr-FR') : '—');
 export const fmtDateTime = (d: string | null | undefined) => (d ? new Date(d).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—');
 export const fmtSize = (n: number) => (n < 1024 ? `${n} o` : n < 1048576 ? `${(n / 1024).toFixed(0)} Ko` : `${(n / 1048576).toFixed(1).replace('.', ',')} Mo`);
+
+export const INVOICE_STATUS: Record<string, { label: string; tone: 'grey' | 'navy' | 'signal' | 'ok' | 'warn' | 'bad' }> = {
+  brouillon: { label: 'Brouillon', tone: 'grey' },
+  emise: { label: 'Émise', tone: 'navy' },
+  partielle: { label: 'Partiellement payée', tone: 'warn' },
+  payee: { label: 'Payée', tone: 'ok' },
+  annulee: { label: 'Annulée', tone: 'grey' },
+};
+
+export const PAYMENT_METHODS: Record<string, string> = {
+  especes: 'Espèces', virement: 'Virement bancaire', cheque: 'Chèque', mobile_money: 'Mobile Money', carte: 'Carte bancaire', autre: 'Autre',
+};
+
+export const EXPENSE_CATEGORIES: Record<string, string> = {
+  materiaux: 'Achat de matériaux', main_oeuvre: 'Main-d’œuvre', transport: 'Transport', location: 'Location de matériel', sous_traitance: 'Sous-traitance',
+  carburant: 'Carburant', deplacement: 'Hébergement et déplacements', administratif: 'Frais administratifs', autre: 'Autres dépenses',
+};
+
+export const EXPENSE_STATUS: Record<string, { label: string; tone: 'grey' | 'navy' | 'warn' | 'ok' }> = {
+  engagee: { label: 'Engagée', tone: 'grey' },
+  facturee: { label: 'Facturée (à payer)', tone: 'warn' },
+  payee: { label: 'Payée', tone: 'ok' },
+};
+
+/** Date du jour (fuseau de l'appareil), au format AAAA-MM-JJ. */
+export const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};

@@ -21,6 +21,7 @@ export interface Organization {
   legal_ids: { label: string; value: string }[]; bank_details: string | null; default_taxes: TaxDef[];
   quote_validity_days: number; payment_terms: string; quote_footer: string | null;
   metre_rules: MetreRules; pricing_method: Omit<CostBreakdown, 'components' | 'baseQty'>;
+  payment_days?: number; reminder_before_days?: number; reminder_every_days?: number;
   plan_id: string; plan_status: 'essai' | 'actif' | 'expire' | 'suspendu' | 'annule'; plan_period: 'mois' | 'an' | null; plan_ends_at: string;
   suspended_reason: string | null; created_at: string;
 }
@@ -38,11 +39,11 @@ export interface Contact {
 export interface Project {
   id: string; org_id: string; reference: string; name: string; client_id: string | null; project_type: string; location: string | null;
   city: string | null; country: string | null; description: string | null; start_date: string | null; end_date: string | null;
-  manager_id: string | null; budget_estimate: number | null; budget_validated: number | null; status: string;
+  manager_id: string | null; budget_estimate: number | null; budget_validated: number | null; budget_revised?: number | null; margin_target_pct?: number | null; status: string;
   archived_at: string | null; created_at: string; updated_at: string;
 }
 
-export interface ProjectLot { id: string; org_id: string; project_id: string; name: string; sort: number }
+export interface ProjectLot { id: string; org_id: string; project_id: string; name: string; sort: number; budget?: number | null }
 
 export interface DocumentRow {
   id: string; org_id: string; project_id: string | null; lot: string | null; doc_type: string; name: string; storage_path: string;
@@ -94,3 +95,26 @@ export interface PlanRender {
 }
 
 export interface AiQuota { quota: number; used: number; remaining: number; period_start: string }
+
+export interface Invoice {
+  id: string; org_id: string; project_id: string | null; client_id: string | null; quote_id: string | null; credit_for: string | null;
+  reference: string | null; kind: 'simple' | 'acompte' | 'situation' | 'finale' | 'avoir'; title: string;
+  status: 'brouillon' | 'emise' | 'partielle' | 'payee' | 'annulee'; issue_date: string | null; due_date: string | null;
+  body: DocBody; settings: QuoteSettings; total_ht: number; net_ht: number; total_ttc: number; incomplete_lines: number; amount_paid: number;
+  payment_terms: string | null; notes: string | null; cancel_reason: string | null; issued_at: string | null; created_at: string; updated_at: string;
+}
+
+export interface Payment {
+  id: string; org_id: string; invoice_id: string; amount: number; paid_on: string; method: PaymentMethod; reference: string | null; note: string | null;
+  verified: boolean; created_by: string | null; created_at: string;
+}
+export type PaymentMethod = 'especes' | 'virement' | 'cheque' | 'mobile_money' | 'carte' | 'autre';
+
+export interface InvoiceReminder { id: string; invoice_id: string; channel: string; note: string | null; sent_by: string | null; sent_at: string }
+
+export interface Expense {
+  id: string; org_id: string; project_id: string | null; lot: string | null; supplier_id: string | null; category: string; label: string;
+  expense_date: string; amount_ht: number; tax_amount: number; amount_ttc: number; status: 'engagee' | 'facturee' | 'payee'; paid_on: string | null;
+  payment_method: PaymentMethod | null; supplier_invoice_ref: string | null; receipt_path: string | null; note: string | null;
+  purchase_order_id: string | null; created_at: string; updated_at: string;
+}

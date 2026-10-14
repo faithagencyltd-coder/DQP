@@ -313,6 +313,46 @@ select tests.login('00000000-0000-0000-0000-00000000000a');
 select tests.check((select units_month from public.admin_ai_overview()) = 10, 'consommation IA visible par la plateforme');
 select tests.check((select count(*) from public.plan_renders) = 0, 'l''administration ne voit pas les rendus des entreprises');
 
+-- ------------------------------------------------------------ facturation, paiements, dépenses
+select tests.login('00000000-0000-0000-0000-00000000000b');
+insert into public.contacts (org_id, kind, name) values (tests.id('org2')::uuid, 'client', 'Client facturé');
+with x as (insert into public.invoices (org_id, client_id, title, body, settings, total_ttc) values (
+  tests.id('org2')::uuid, (select id from public.contacts where name = 'Client facturé'), 'Facture test',
+  '{"lots":[{"id":"l1","code":"LOT 01","name":"Gros œuvre","lines":[{"id":"a","kind":"titre","designation":"Titre"},{"id":"b","kind":"ouvrage","qty":3,"unitPrice":1000.5},{"id":"c","kind":"ouvrage","qty":2.5,"unitPrice":333},{"id":"d","kind":"ouvrage","qty":null,"unitPrice":10}]}]}',
+  '{"currency":"XOF","discountPct":5,"taxes":[{"label":"TVA","rate":18}]}', 1) returning id)
+insert into tests.ids select 'inv', id from x;
+select tests.check((select total_ht = 3835 and net_ht = 3643 and total_ttc = 4299 and incomplete_lines = 1 and reference is null and status = 'brouillon' from public.invoices where id = tests.id('inv')::uuid),
+  'totaux recalculés par la base (3 × 1000,5 → 3 002 ; 2,5 × 333 → 833 ; remise 5 % ; TVA 18 % → 4 299), total envoyé ignoré');
+select tests.fails(format('update public.invoices set total_ttc = 1 where id = %L', tests.id('inv')), 'permission denied', 'le total d''une facture ne se saisit pas');
+select tests.fails(format('select public.issue_invoice(%L)', tests.id('inv')), 'sans quantité', 'émission refusée avec une ligne incomplète');
+update public.invoices set body = jsonb_set(body, '{lots,0,lines,3,qty}', '1') where id = tests.id('inv')::uuid;
+select tests.check((select total_ttc from public.invoices where id = tests.id('inv')::uuid) = 4311, 'totaux recalculés à chaque modification (3 845 − 192 = 3 653 ; TVA 658 ; 4 311)');
+select public.issue_invoice(tests.id('inv')::uuid);
+select tests.check((select reference like 'FAC-____-0001' and status = 'emise' and due_date = issue_date + 30 from public.invoices where id = tests.id('inv')::uuid), 'émission : numéro FAC continu, échéance à 30 jours');
+select tests.fails(format('update public.invoices set title = ''Autre'' where id = %L', tests.id('inv')), 'émise', 'facture émise figée (correction par avoir)');
+delete from public.invoices where id = tests.id('inv')::uuid;
+select tests.check((select count(*) from public.invoices where id = tests.id('inv')::uuid) = 1, 'une facture émise ne se supprime pas');
+select tests.fails(format('insert into public.payments (org_id, invoice_id, amount, method) values (%L, %L, 5000, ''especes'')', tests.id('org2'), tests.id('inv')), 'dépasse le solde', 'paiement supérieur au solde refusé');
+insert into public.payments (org_id, invoice_id, amount, method, verified) values (tests.id('org2')::uuid, tests.id('inv')::uuid, 1310, 'mobile_money', true);
+select tests.check((select status = 'partielle' and amount_paid = 1310 from public.invoices where id = tests.id('inv')::uuid), 'paiement partiel : facture partiellement payée');
+select tests.check((select bool_and(not verified) from public.payments), 'un paiement saisi n''est jamais marqué « confirmé »');
+insert into public.payments (org_id, invoice_id, amount, method) values (tests.id('org2')::uuid, tests.id('inv')::uuid, 3001, 'virement');
+select tests.check((select status from public.invoices where id = tests.id('inv')::uuid) = 'payee', 'solde atteint : facture payée');
+select tests.fails(format('insert into public.payments (org_id, invoice_id, amount, method) values (%L, %L, 1, ''especes'')', tests.id('org2'), tests.id('inv')), 'déjà soldée', 'pas de paiement sur une facture soldée');
+with x as (insert into public.invoices (org_id, client_id, kind, credit_for, title, body) values (tests.id('org2')::uuid, (select id from public.contacts where name = 'Client facturé'), 'avoir', tests.id('inv')::uuid, 'Avoir partiel',
+  '{"lots":[{"id":"l","code":"LOT 01","name":"Avoir","lines":[{"id":"z","kind":"ouvrage","qty":1,"unitPrice":-500}]}]}') returning id)
+insert into tests.ids select 'avo', id from x;
+select tests.check(public.issue_invoice(tests.id('avo')::uuid) like 'AVO-____-0001', 'avoir numéroté dans sa propre suite');
+select tests.login('00000000-0000-0000-0000-00000000000a');
+select tests.check((select count(*) from public.invoices) = 0 and (select count(*) from public.payments) = 0, 'isolation : A ne voit ni les factures ni les paiements de B');
+select tests.fails(format('select public.issue_invoice(%L)', tests.id('inv')), 'introuvable', 'A ne peut pas émettre une facture de B');
+
+select tests.login('00000000-0000-0000-0000-00000000000b');
+insert into public.expenses (org_id, category, label, amount_ht, tax_amount) values (tests.id('org2')::uuid, 'materiaux', 'Ciment 20 sacs', 100000, 18000);
+select tests.check((select amount_ttc from public.expenses where label = 'Ciment 20 sacs') = 118000, 'dépense : TTC calculé par la base');
+select tests.fails(format('insert into public.expenses (org_id, category, label, amount_ht, status) values (%L, ''transport'', ''Camion'', 5000, ''payee'')', tests.id('org2')), 'check constraint', 'dépense payée : date de paiement obligatoire');
+select tests.fails(format('insert into public.expenses (org_id, category, label, amount_ht, receipt_path) values (%L, ''autre'', ''X'', 1, %L)', tests.id('org2'), tests.id('org1') || '/depenses/x.pdf'), 'check constraint', 'justificatif rangé chez une autre entreprise refusé');
+
 -- ------------------------------------------------------------ double authentification
 reset role;
 insert into auth.mfa_factors (user_id, status) values ('00000000-0000-0000-0000-00000000000b', 'verified');

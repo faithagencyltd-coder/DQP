@@ -12,6 +12,7 @@ import { Allowed } from '../../ui/guard';
 import { ContactForm } from './Contacts';
 import { DocumentsPanel } from './Documents';
 import { ActivityList } from './Journal';
+import { ProjectFinance } from './ProjectFinance';
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -128,7 +129,7 @@ export function ProjectForm({ initial, onClose, onSaved }: { initial?: Project; 
   );
 }
 
-type Tab = 'infos' | 'lots' | 'metres' | 'dqe' | 'devis' | 'documents' | 'journal' | 'gestion';
+type Tab = 'infos' | 'lots' | 'metres' | 'dqe' | 'devis' | 'finances' | 'documents' | 'journal' | 'gestion';
 
 export function ProjectDetail() {
   const { id } = useParams();
@@ -166,6 +167,7 @@ export function ProjectDetail() {
         { id: 'metres', label: `Métrés (${metres.data?.length ?? 0})`, hidden: !can('metres', 'consulter') },
         { id: 'dqe', label: `DQE / BPU (${dqe.length})`, hidden: !can('dqe', 'consulter') },
         { id: 'devis', label: `Devis (${devis.length})`, hidden: !can('devis', 'consulter') },
+        { id: 'finances', label: 'Finances', hidden: !can('depenses', 'consulter') && !can('factures', 'consulter') },
         { id: 'documents', label: 'Documents', hidden: !can('documents', 'consulter') },
         { id: 'journal', label: 'Historique' },
         { id: 'gestion', label: 'Gestion de chantier' },
@@ -186,7 +188,7 @@ export function ProjectDetail() {
               ['Devis acceptés (TTC)', formatMoney(devis.filter((d) => d.status === 'accepte').reduce((s, d) => s + (d.total_ttc ?? 0), 0), cur)],
               ['Devis en cours (TTC)', formatMoney(devis.filter((d) => ['brouillon', 'en_validation', 'envoye'].includes(d.status)).reduce((s, d) => s + (d.total_ttc ?? 0), 0), cur)],
             ]} />
-            <p className="mt-4 text-[12.5px] text-muted">Dépenses réelles, montants facturés et encaissés, marges : avec les modules de gestion (phase 5).</p>
+            <p className="mt-4 text-[12.5px] text-muted">Dépenses réelles, facturé, encaissé et marges : onglet « Finances ».</p>
           </Card>
         </div>
       )}
@@ -212,13 +214,14 @@ export function ProjectDetail() {
           ))}
         </Card>
       )}
+      {tab === 'finances' && <ProjectFinance project={x} />}
       {tab === 'documents' && <DocumentsPanel projectId={x.id} />}
       {tab === 'journal' && <Card title="Historique du projet"><ActivityList projectId={x.id} /></Card>}
       {tab === 'gestion' && (
         <Card title="Gestion de chantier">
           <p className="text-[14px] text-ink-2">Les rubriques suivantes de la fiche chantier arrivent avec la phase 5 du cahier des charges et ne sont pas encore disponibles :</p>
           <ul className="mt-3 grid gap-1.5 text-[14px] text-ink-2 sm:grid-cols-2">
-            {['Achats et commandes', 'Dépenses et budget réel', 'Matériaux et stocks', 'Équipe et planning', 'Photos et rapports journaliers', 'Réserves et observations', 'Documents de réception'].map((t) => <li key={t} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-signal-500" />{t}</li>)}
+            {['Achats et commandes', 'Matériaux et stocks', 'Équipe et planning', 'Photos et rapports journaliers', 'Réserves et observations', 'Documents de réception'].map((t) => <li key={t} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-signal-500" />{t}</li>)}
           </ul>
           <p className="mt-3 text-[13px] text-muted">Les photos, procès-verbaux et documents de réception peuvent déjà être déposés dans l’onglet Documents.</p>
         </Card>
