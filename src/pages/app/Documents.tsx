@@ -1,7 +1,7 @@
 import { Download, Eye, FilePlus2, FolderOpen, History, Trash2, Upload } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { deleteRow, insertRow, updateRow, useAction, useRows } from '../../lib/api';
-import { supabase } from '../../lib/supabase';
+import { fileUrl, supabase } from '../../lib/supabase';
 import { errorMessage } from '../../lib/errors';
 import { DOC_TYPES, WORK_STATUS, fmtDateTime, fmtSize } from '../../lib/labels';
 import { useOrg } from '../../lib/session';
@@ -40,9 +40,16 @@ export async function checkFile(file: File): Promise<{ mime: string } | { error:
 }
 
 export async function openSigned(path: string, download?: string) {
-  const { data, error } = await supabase.storage.from('documents').createSignedUrl(path, 120, download ? { download } : undefined);
-  if (error || !data) throw new Error(errorMessage(error ?? 'Lien indisponible'));
-  window.open(data.signedUrl, '_blank', 'noopener');
+  let url: string;
+  try { url = await fileUrl(path, 120, download); } catch (e) { throw new Error(errorMessage(e)); }
+  if (download && url.startsWith('blob:')) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = download;
+    a.click();
+    return;
+  }
+  window.open(url, '_blank', 'noopener');
 }
 
 function UploadForm({ projectId, previous, onClose }: { projectId?: string; previous?: DocumentRow; onClose: () => void }) {

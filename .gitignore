@@ -6,3 +6,4 @@ dist/
 .env.local
 # Fichiers de projets clients : ne jamais les versionner
 samples/private/
+dist-demo/

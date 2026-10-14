@@ -122,3 +122,24 @@ sh scripts/local-package/build.sh /chemin/de/travail   # produit les fichiers à
 - Vérification : `scripts/local-package/smoke.mjs` (inscription, entreprise, espace administrateur)
   sur le paquet réassemblé, avec une base vierge. Le lancement des `.bat` lui-même n'a pas pu être
   exécuté ici (pas de Windows dans l'environnement de construction).
+
+## 6. Fichier de démonstration autonome — `npm run build:demo`
+
+Un **seul fichier HTML** (`dist-demo/index.html`, environ 19 Mo) qui s'ouvre d'un double-clic, sans
+installation, sans serveur et sans Internet (Chrome, Edge ou Firefox récents) :
+
+- la vraie base PostgreSQL tourne dans le navigateur (PGlite, WebAssembly) avec **les mêmes
+  migrations, fonctions et règles d'accès (RLS)** que la production ; `src/demo/backend.ts` traite les
+  appels de la bibliothèque Supabase (données, authentification, fichiers) ;
+- base de départ (`scripts/demo/build-seed.mjs`) : deux comptes d'essai (`demo@planora.bj`,
+  propriétaire et administrateur de la plateforme ; `conducteur@planora.bj`, droits limités ; mot de passe
+  `Demo2026`) et une entreprise d'exemple sur l'offre Professionnelle ; toutes les données d'exemple sont
+  marquées fictives ;
+- données conservées dans le navigateur (IndexedDB), une seule fenêtre à la fois, bouton « Réinitialiser » ;
+- rendu IA et envoi de courriels indisponibles (services en ligne).
+
+Vérifications :
+- `node scripts/demo/serve-backend.mjs` expose le même serveur interne en HTTP (port 54320) : la recette
+  complète (`scripts/e2e.mjs`, 61 étapes) y passe entièrement ;
+- `node scripts/demo/smoke.mjs dist-demo/index.html` ouvre le fichier depuis le disque : connexion,
+  écriture, conservation après rechargement, second onglet refusé, devis et PDF, administration.

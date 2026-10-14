@@ -9,4 +9,7 @@ export const config = {
   environment: (import.meta.env.VITE_ENVIRONMENT as string | undefined) ?? 'test',
 };
 
-export const isConfigured = () => !!config.supabaseUrl && !!config.supabaseKey;
+/** Version de démonstration autonome (un seul fichier HTML, base embarquée dans le navigateur). */
+export const isDemo = import.meta.env.VITE_DEMO === '1';
+
+export const isConfigured = () => isDemo || (!!config.supabaseUrl && !!config.supabaseKey);

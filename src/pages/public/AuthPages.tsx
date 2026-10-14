@@ -4,6 +4,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { errorMessage } from '../../lib/errors';
 import { useAuth } from '../../lib/session';
+import { isDemo } from '../../lib/config';
+import { DemoLogins } from '../../demo/DemoUi';
 import { Button, Checkbox, Field, Input, Notice } from '../../ui';
 import { Logo } from '../../ui/Logo';
 
@@ -53,6 +55,7 @@ export function LoginPage() {
     <AuthLayout title="Connexion" subtitle="Accédez à votre espace PLANORA BTP." footer={<>Pas encore de compte ? <Link className="link" to="/inscription">Créer un compte</Link></>}>
       <form onSubmit={submit} className="space-y-4">
         {params.get('confirme') && <Notice tone="ok" title="Adresse e-mail confirmée">Vous pouvez vous connecter.</Notice>}
+        {isDemo && <DemoLogins onPick={(e, p) => { setEmail(e); setPassword(p); }} />}
         {error && <Notice tone="bad">{error}</Notice>}
         <Field label="Adresse e-mail"><Input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
         <Field label="Mot de passe"><Input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></Field>

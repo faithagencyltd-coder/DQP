@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Copy, ImageUp, KeyRound, Link2, LogOut, MessageCircle, Plus, RotateCcw, ShieldCheck, Trash2, UserMinus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { deleteRow, insertRow, rpc, updateRow, useAction, useRows } from '../../lib/api';
-import { supabase } from '../../lib/supabase';
+import { fileUrl, supabase } from '../../lib/supabase';
 import { errorMessage } from '../../lib/errors';
 import { ACTION_LABEL, COUNTRIES, MODULE_LABEL, ROLE_LABEL, fmtDate, fmtDateTime } from '../../lib/labels';
 import { useAuth, useOrg } from '../../lib/session';
@@ -53,7 +53,7 @@ function CompanySettings() {
   useEffect(() => setF(org), [org]);
   useEffect(() => {
     if (!org?.logo_path) return setLogoUrl(null);
-    supabase.storage.from('documents').createSignedUrl(org.logo_path, 600).then(({ data }) => setLogoUrl(data?.signedUrl ?? null));
+    fileUrl(org.logo_path, 600).then(setLogoUrl, () => setLogoUrl(null));
   }, [org?.logo_path]);
   const editable = can('entreprise', 'modifier');
   const save = useAction(async () => {

@@ -7,6 +7,8 @@ import { Badge, cx, Menu } from '../ui';
 import { Logo, LogoMark } from '../ui/Logo';
 import { GROUP_LABEL, NAV, type NavItem } from './nav';
 import { NotificationBell } from './Notifications';
+import { isDemo } from '../lib/config';
+import { DemoBanner } from '../demo/DemoUi';
 
 function useVisibleNav(): NavItem[] {
   const { can } = useOrg();
@@ -142,6 +144,7 @@ export function AppShell() {
           <NavLink to="/app/assistance" className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-ink-2 hover:bg-navy-50"><LifeBuoy size={16} />Assistance</NavLink>
           <NotificationBell />
         </header>
+        {isDemo && <DemoBanner />}
         <SubscriptionBanner />
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-[1400px] px-4 py-5 sm:px-6 sm:py-7">

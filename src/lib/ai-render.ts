@@ -3,7 +3,7 @@
 // « rendu-ia », seule détentrice de la clé du fournisseur. L'état réel (en cours, terminé,
 // échec) est toujours relu dans la base.
 
-import { supabase } from './supabase';
+import { fileUrl, supabase } from './supabase';
 import { errorMessage } from './errors';
 import type { PlanRender } from './types';
 import type { Frame } from '../engine/plan/render';
@@ -53,7 +53,5 @@ export async function startAiRender(args: { planId: string; source: PlanRender['
 }
 
 export async function signedUrl(path: string, seconds = 600): Promise<string> {
-  const { data, error } = await supabase.storage.from('documents').createSignedUrl(path, seconds);
-  if (error || !data) throw new Error(errorMessage(error ?? 'Lien indisponible'));
-  return data.signedUrl;
+  try { return await fileUrl(path, seconds); } catch (e) { throw new Error(errorMessage(e)); }
 }
