@@ -1,6 +1,6 @@
 #!/bin/sh
-# Assemble le paquet de test local Windows de PLANORA BTP (3 fichiers à envoyer :
-# ASSEMBLER-PLANORA.bat + PLANORA-BTP-local.zip.part0 + .part1).
+# Assemble le paquet de test local Windows de PLANORA BTP (fichiers à envoyer :
+# ASSEMBLER-PLANORA.bat + PLANORA-BTP-local.zip.part0, .part1…).
 # Usage : sh scripts/local-package/build.sh <dossier_de_travail>
 # Télécharge : PostgreSQL 16 (paquet npm @embedded-postgres/windows-x64), PostgREST 12.2.3,
 # Node.js 22.22.0 et le runtime Visual C++ (paquet PyPI msvc-runtime).
@@ -37,11 +37,18 @@ cp supabase/tests/shim_supabase.sql "$PKG/app/sql/0000_environnement_local.sql"
 cp supabase/migrations/*.sql "$PKG/app/sql/"
 for f in DEMARRER-PLANORA.bat ARRETER-PLANORA.bat LISEZ-MOI.txt; do sed 's/$/\r/' "scripts/local-package/$f" > "$PKG/$f"; done
 sed 's/$/\r/' scripts/local-package/arreter-services.bat > "$PKG/app/arreter-services.bat"
-sed 's/$/\r/' scripts/local-package/ASSEMBLER-PLANORA.bat > "$W/sortie/ASSEMBLER-PLANORA.bat"
 
 cd "$W"
 rm -f PLANORA-BTP-local.zip && zip -q -r -9 PLANORA-BTP-local.zip PLANORA-BTP
-SIZE=$(stat -c %s PLANORA-BTP-local.zip)
-HALF=$(( (SIZE + 1) / 2 ))
-split -b "$HALF" -d -a 1 PLANORA-BTP-local.zip "sortie/PLANORA-BTP-local.zip.part"
+# Parties de 28 Mo au plus (limite d'envoi de 30 Mo par fichier).
+split -b 28m -d -a 1 PLANORA-BTP-local.zip "sortie/PLANORA-BTP-local.zip.part"
+N=$(ls sortie/PLANORA-BTP-local.zip.part* | wc -l)
+PARTS=""; CHECKS=""
+i=0
+while [ $i -lt $N ]; do
+  PARTS="$PARTS${PARTS:++}\"PLANORA-BTP-local.zip.part$i\""
+  CHECKS="${CHECKS}if not exist \"PLANORA-BTP-local.zip.part$i\" goto manque\n"
+  i=$((i + 1))
+done
+sed -e "s|@PARTS@|$PARTS|" -e "s|@CHECKS@|$CHECKS|" -e "s|@N@|$((N + 1))|g" "$ROOT/scripts/local-package/ASSEMBLER-PLANORA.bat" | sed 's/$/\r/' > sortie/ASSEMBLER-PLANORA.bat
 ls -la sortie

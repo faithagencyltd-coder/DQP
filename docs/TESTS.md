@@ -109,10 +109,10 @@ Pour essayer PLANORA BTP sur un PC Windows 10 / 11 (64 bits) sans rien installer
 ligne : PostgreSQL 16, PostgREST 12, Node.js 22 et le runtime Visual C++ sont embarqués.
 
 ```bash
-sh scripts/local-package/build.sh /chemin/de/travail   # produit 3 fichiers dans <travail>/sortie
+sh scripts/local-package/build.sh /chemin/de/travail   # produit les fichiers à envoyer dans <travail>/sortie
 ```
 
-- `ASSEMBLER-PLANORA.bat` + `PLANORA-BTP-local.zip.part0` + `.part1` : placer les trois dans un même
+- `ASSEMBLER-PLANORA.bat` + `PLANORA-BTP-local.zip.part0`, `.part1`, `.part2` (28 Mo au plus chacune) : placer le tout dans un même
   dossier, double-cliquer sur `ASSEMBLER-PLANORA.bat`, puis sur `PLANORA-BTP\DEMARRER-PLANORA.bat`.
 - Premier lancement : création de la base (migrations appliquées une seule fois, suivies dans
   `planora_local.applied`), saisie facultative de l'adresse de l'administrateur de la plateforme.
