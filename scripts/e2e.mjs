@@ -438,6 +438,97 @@ try {
   await shot(page, '25-mouvements');
   ok('journal des mouvements : réception, transferts, sortie, inventaire');
 
+  // ------------------------------------------------------------ planning, rapport journalier, réserves
+  const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  await nav(page, 'Planning');
+  const addTask = async (title, start, end, status, deps = []) => {
+    await page.getByRole('button', { name: 'Nouvelle tâche', exact: true }).click();
+    const d = page.getByRole('dialog');
+    await d.getByLabel(/^Titre/).fill(title);
+    await d.getByLabel(/^Début/).fill(start);
+    await d.getByLabel(/^Fin/).fill(end);
+    await d.getByLabel('Statut').selectOption(status);
+    for (const dep of deps) await d.getByLabel(new RegExp(`^${dep}`)).check();
+    await d.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+    await page.getByRole('button', { name: `Ouvrir la tâche ${title}` }).waitFor();
+  };
+  await addTask('Implantation et fouilles', day(-10), day(-3), 'termine');
+  await addTask('Fondations', day(-2), day(5), 'en_cours', ['Implantation et fouilles']);
+  await addTask('Élévation des murs', day(3), day(20), 'a_faire', ['Fondations']);
+  await addTask('Clôture provisoire', day(-8), day(-1), 'a_faire');
+  await page.getByText('Dépendances à revoir').waitFor();
+  await page.getByText(/1 tâche\(s\) en retard/).waitFor();
+  await shot(page, '26-planning-gantt');
+  ok('planning : 4 tâches, dépendances (chevauchement signalé), tâche en retard signalée, chronologie');
+  await page.getByRole('button', { name: 'Calendrier', exact: true }).click();
+  await page.getByRole('button', { name: 'Fondations', exact: true }).first().waitFor();
+  await page.getByRole('button', { name: 'Liste', exact: true }).click();
+  await page.getByRole('button', { name: 'Chronologie', exact: true }).click();
+  await page.getByRole('button', { name: 'Ouvrir la tâche Implantation et fouilles' }).click();
+  await page.getByRole('dialog').getByLabel('Statut').selectOption('valide');
+  await page.getByRole('dialog').getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await page.getByText('Tâche enregistrée.').first().waitFor();
+  ok('tâche terminée puis validée par le responsable');
+  await page.getByRole('tab', { name: 'Avancement' }).click();
+  await page.getByText('25 %', { exact: true }).first().waitFor(); // 1 tâche terminée sur 4
+  await page.getByLabel('Méthode d’avancement').selectOption('quantites');
+  await page.getByText('Tâches exclues du calcul').waitFor();
+  await page.getByLabel('Méthode d’avancement').selectOption('taches');
+  await shot(page, '27-avancement');
+  ok('avancement : 25 % (1 tâche terminée sur 4), méthode affichée ; méthode « quantités » : tâches sans quantité exclues, non devinées');
+
+  await page.getByRole('tab', { name: 'Rapports journaliers' }).click();
+  await page.getByRole('button', { name: 'Nouveau rapport', exact: true }).click();
+  await page.getByText(/RJ-\d{4}-0001/).first().waitFor();
+  await page.getByLabel('Météo').selectOption('Ensoleillé');
+  await page.getByLabel('Travaux exécutés').fill('Coulage du béton de propreté, ferraillage des semelles axe A à C.');
+  await page.getByRole('button', { name: 'Ajouter une fonction', exact: true }).click();
+  await page.getByLabel('Fonction').fill('Maçons');
+  await page.getByLabel('Nombre').fill('4');
+  await page.getByText('Sorties de stock de ce jour pour ce chantier').waitFor();
+  await page.getByRole('button', { name: 'Reprendre dans « Matériaux utilisés »' }).click();
+  await page.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await page.getByText('Rapport enregistré.').first().waitFor();
+  await page.getByLabel('Fichiers photo').setInputFiles(`${OUT}/23-commande.png`);
+  await page.getByText('1 photo(s) ajoutée(s).').first().waitFor();
+  await page.getByRole('img', { name: 'Photo du chantier' }).first().waitFor();
+  await page.getByRole('button', { name: 'Soumettre', exact: true }).click();
+  await page.getByText('en attente de validation').waitFor();
+  await page.getByRole('button', { name: 'Valider', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Valider', exact: true }).click();
+  await page.getByText(/Le rapport est figé/).waitFor();
+  await shot(page, '28-rapport-journalier');
+  const [rj] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'PDF', exact: true }).click()]);
+  await rj.saveAs(`${OUT}/rapport-journalier.pdf`);
+  const rjPdf = readFileSync(`${OUT}/rapport-journalier.pdf`);
+  if (rjPdf.subarray(0, 4).toString() !== '%PDF' || rjPdf.length < 20000) throw new Error('PDF du rapport journalier invalide (photo absente ?)');
+  ok(`rapport journalier : effectifs, matériaux repris des sorties de stock réelles, photo réduite, soumis puis validé (figé), PDF avec photo (${Math.round(rjPdf.length / 1024)} Ko)`);
+
+  await page.getByRole('link', { name: '← Rapports journaliers' }).click();
+  await page.getByRole('tab', { name: 'Réserves' }).click();
+  await page.getByRole('button', { name: 'Nouvelle réserve', exact: true }).click();
+  dlg = page.getByRole('dialog');
+  await dlg.getByLabel(/^Réserve/).fill('Fissure sur l’enduit, façade nord');
+  await dlg.getByLabel('Localisation').fill('Façade nord');
+  await dlg.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await dlg.getByText(/RES-\d{4}-0001/).waitFor();
+  await dlg.getByRole('button', { name: 'Marquer levée', exact: true }).click();
+  await dlg.getByRole('button', { name: 'Valider la levée', exact: true }).click();
+  await dlg.getByText('Levée et validée').waitFor();
+  await dlg.getByRole('button', { name: 'Fermer', exact: true }).last().click();
+  await page.getByLabel('Filtre des réserves').selectOption('toutes');
+  await page.locator('table').getByText('Fissure sur l’enduit, façade nord').waitFor();
+  ok('réserve constatée, levée puis levée validée (close)');
+
+  await nav(page, 'Projets et chantiers');
+  await page.getByText('Villa R+1 Fidjrossè').filter({ visible: true }).first().click();
+  await page.getByRole('tab', { name: 'Gestion de chantier' }).click();
+  await page.getByText('Matériaux sortis du stock vers ce chantier').waitFor();
+  await page.getByText('5 sac').first().waitFor();
+  await page.getByText('Avancement mesuré').waitFor();
+  await shot(page, '29-fiche-chantier');
+  ok('fiche chantier : avancement, rapports, réserves, commandes et matériaux sortis du stock');
+
   // ------------------------------------------------------------ plans : dessin, pièces, rendus
   await nav(page, 'Plans techniques');
   await page.getByRole('button', { name: 'Nouveau plan', exact: true }).click();

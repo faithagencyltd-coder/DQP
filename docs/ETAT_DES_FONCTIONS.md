@@ -59,6 +59,18 @@ Détail du module, des coûts et des limites : `docs/RENDU_PLANS.md`.
 | Bons de commande (BC-) : lignes, total recalculé par le serveur, validation puis figés, envoi, annulation, PDF ; réceptions totales ou partielles avec entrée en stock ; rapprochement avec la facture du fournisseur et création de la dépense | ✅ Terminé | 3 tests moteur, contrôles SQL, recette 33 |
 | Stocks par dépôt calculés **uniquement** à partir des mouvements ; stock négatif refusé par le serveur ; entrées, sorties affectées à un chantier, transferts, inventaires (écart tracé avec motif), ajustements motivés ; seuils minimums et alertes ; journal et exports CSV | ✅ Terminé | contrôles SQL, recette 31 et 34-37 |
 
+## Planning et suivi de chantier (§19)
+
+| Élément | État | Vérification |
+|---|---|---|
+| Tâches : titre, chantier, lot, responsable (membre ou intervenant externe), début, fin, durée, statut (à faire, en cours, en attente, bloqué, terminé, validé), priorité, dépendances, observations | ✅ Terminé | contrôles SQL, recette 38 |
+| Vues chronologique (Gantt avec flèches de dépendance, aujourd’hui, retards), calendrier mensuel et liste ; export CSV | ✅ Terminé | recette 38 |
+| Règles serveur : dépendances du même chantier sans boucle, « validé » réservé au droit « valider » et seulement après « terminé », tâche validée non supprimable | ✅ Terminé | contrôles SQL, recette 39 |
+| Avancement selon une méthode choisie et affichée (tâches terminées, quantités exécutées, pondération) ; tâches sans donnée exclues et listées, jamais estimées ; avancement prévu d’après les dates | ✅ Terminé | 5 tests moteur, recette 40 |
+| Rapports journaliers : conditions, travaux, effectifs, matériaux (avec reprise des sorties de stock réelles du jour), matériels, incidents, retards, observations, photos réduites avant envoi ; soumission, validation ou renvoi ; rapport validé figé ; PDF avec photos | ✅ Terminé | contrôles SQL, recette 41 |
+| Réserves : constat avec photos, localisation, intervenant, échéance, levée puis validation de la levée ; export CSV et PDF | ✅ Terminé | contrôles SQL, recette 42 |
+| Fiche chantier « Gestion de chantier » : avancement, retards, rapports, réserves, commandes et matériaux sortis du stock | ✅ Terminé | recette 43 |
+
 ## Autres fonctions livrées
 
 | Élément | État |
@@ -80,7 +92,7 @@ Détail du module, des coûts et des limites : `docs/RENDU_PLANS.md`.
 | Paiement des abonnements | Demande + activation manuelle par l’administration ; le paiement en ligne (Mobile Money, carte) attend le choix d’un prestataire. |
 | Permissions par projet | La matrice est par entreprise ; la restriction par projet viendra avec les équipes de chantier. |
 | Client externe | Rôle non encore ouvert (accès limité aux devis et rapports). |
-| Rapports | DQE, BPU, devis, métrés, factures, bons de commande, dépenses et stocks s’exportent ; les rapports de chantier (journaliers) arrivent avec le planning. |
+| Rapports | DQE, BPU, devis, métrés, factures, bons de commande, dépenses, stocks, planning, rapports journaliers et réserves s’exportent ; les rapports de synthèse (financier, avancement, achats) arrivent avec le tableau de bord complet. |
 
 ## Non réalisé (signalé « bientôt » dans l’application)
 
@@ -88,6 +100,5 @@ Détail du module, des coûts et des limites : `docs/RENDU_PLANS.md`.
 |---|---|
 | Plans : comparaison de versions (§9.5), fichiers DWG (exporter en PDF) et import DXF, rotation du fond, outils de CAO avancés (arc, cercle, décalage, hachures), symboles électriques / plomberie / ventilation | Phase 3 (suite) |
 | Assistant IA, OCR (le quota IA est déjà en place) | Phase 4 |
-| Planning, tâches, rapports journaliers avec photos, réserves | Phase 5 (suite) |
 | Notifications (application, e-mail, SMS), support | Phase 6 |
 | Mode hors ligne | Non commencé (l’application est installable sur l’écran d’accueil mais nécessite Internet) |

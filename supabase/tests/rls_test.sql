@@ -387,6 +387,50 @@ select tests.fails('delete from public.stock_movements', 'permission denied', 'l
 select tests.login('00000000-0000-0000-0000-00000000000a');
 select tests.check((select count(*) from public.stock_levels) = 0 and (select count(*) from public.purchase_orders) = 0, 'isolation : A ne voit ni les stocks ni les commandes de B');
 
+-- ------------------------------------------------------------ planning, suivi journalier, réserves
+select tests.login('00000000-0000-0000-0000-00000000000b');
+with x as (insert into public.projects (org_id, name) values (tests.id('org2')::uuid, 'Immeuble Ganhi') returning id) insert into tests.ids select 'prj', id from x;
+with x as (insert into public.tasks (org_id, project_id, title, start_date, end_date) values (tests.id('org2')::uuid, tests.id('prj')::uuid, 'Fondations', '2026-11-02', '2026-11-13') returning id) insert into tests.ids select 't1', id from x;
+with x as (insert into public.tasks (org_id, project_id, title, start_date, end_date, depends_on) values (tests.id('org2')::uuid, tests.id('prj')::uuid, 'Élévation', '2026-11-16', '2026-12-04', array[tests.id('t1')::uuid]) returning id) insert into tests.ids select 't2', id from x;
+with x as (insert into public.tasks (org_id, project_id, title, start_date, end_date, depends_on) values (tests.id('org2')::uuid, tests.id('prj')::uuid, 'Dalle', '2026-12-07', '2026-12-18', array[tests.id('t2')::uuid]) returning id) insert into tests.ids select 't3', id from x;
+select tests.check((select count(*) from public.tasks where project_id = tests.id('prj')::uuid) = 3, 'trois tâches enchaînées');
+select tests.fails(format('update public.tasks set depends_on = array[%L]::uuid[] where id = %L', tests.id('t3'), tests.id('t1')), 'boucle', 'dépendances en boucle refusées');
+select tests.fails(format('update public.tasks set depends_on = array[%L]::uuid[] where id = %L', tests.id('t1'), tests.id('t1')), 'elle-même', 'une tâche ne dépend pas d''elle-même');
+select tests.fails(format('insert into public.tasks (org_id, project_id, title, start_date, end_date) values (%L, %L, ''X'', ''2026-11-10'', ''2026-11-01'')', tests.id('org2'), tests.id('prj')), 'check constraint', 'fin avant début refusée');
+select tests.fails(format('insert into public.tasks (org_id, project_id, title, start_date, end_date, status) values (%L, %L, ''X'', ''2026-11-10'', ''2026-11-11'', ''valide'')', tests.id('org2'), tests.id('prj')), 'terminée', 'une tâche ne naît pas validée');
+select tests.fails(format('update public.tasks set status = ''valide'' where id = %L', tests.id('t1')), 'terminée', 'validation seulement après « terminé »');
+update public.tasks set status = 'termine' where id = tests.id('t1')::uuid;
+update public.tasks set status = 'valide', validated_by = null where id = tests.id('t1')::uuid;
+select tests.check((select validated_by = auth.uid() and validated_at is not null from public.tasks where id = tests.id('t1')::uuid), 'tâche validée : auteur et date posés par la base');
+select tests.no_rows(format('delete from public.tasks where id = %L', tests.id('t1')), 'une tâche validée ne se supprime pas');
+delete from public.tasks where id = tests.id('t2')::uuid;
+select tests.check((select depends_on = '{}' from public.tasks where id = tests.id('t3')::uuid), 'tâche supprimée retirée des dépendances');
+
+with x as (insert into public.daily_reports (org_id, project_id, report_date, work_done, workforce, status) values (tests.id('org2')::uuid, tests.id('prj')::uuid, '2026-11-03', 'Fouilles en rigole', '[{"role":"Maçons","count":4},{"role":"Manœuvres","count":6}]', 'valide') returning id) insert into tests.ids select 'rj', id from x;
+select tests.check((select status = 'brouillon' and reference like 'RJ-____-0001' from public.daily_reports where id = tests.id('rj')::uuid), 'rapport journalier numéroté, toujours créé en brouillon');
+select tests.fails(format('insert into public.daily_reports (org_id, project_id, report_date) values (%L, %L, ''2026-11-03'')', tests.id('org2'), tests.id('prj')), 'duplicate key', 'un seul rapport par chantier et par jour');
+select tests.fails(format('update public.daily_reports set photos = %L where id = %L', '[{"path":"' || tests.id('org1') || '/suivi/x.jpg"}]', tests.id('rj')), 'hors du dossier', 'photo rangée chez une autre entreprise refusée');
+select tests.fails(format('update public.daily_reports set workforce = ''[{"role":"Maçons","count":2.5}]'' where id = %L', tests.id('rj')), 'Effectif invalide', 'effectif non entier refusé');
+update public.daily_reports set status = 'valide' where id = tests.id('rj')::uuid;
+select tests.check((select status from public.daily_reports where id = tests.id('rj')::uuid) = 'brouillon', 'le statut ne se change pas par une simple mise à jour');
+select tests.fails(format('select public.set_report_status(%L, ''valide'')', tests.id('rj')), 'soumis', 'un brouillon ne se valide pas directement');
+select public.set_report_status(tests.id('rj')::uuid, 'soumis');
+select public.set_report_status(tests.id('rj')::uuid, 'valide', 'Conforme');
+select tests.fails(format('update public.daily_reports set work_done = ''modifié'' where id = %L', tests.id('rj')), 'validé', 'rapport validé figé');
+select tests.no_rows(format('delete from public.daily_reports where id = %L', tests.id('rj')), 'rapport validé non supprimable');
+
+with x as (insert into public.reserves (org_id, project_id, title, location, status) values (tests.id('org2')::uuid, tests.id('prj')::uuid, 'Fissure enduit façade nord', 'Façade nord', 'levee') returning id) insert into tests.ids select 'res', id from x;
+select tests.check((select status = 'ouverte' and reference like 'RES-____-0001' from public.reserves where id = tests.id('res')::uuid), 'réserve numérotée, créée ouverte');
+select tests.fails(format('update public.reserves set status = ''validee'' where id = %L', tests.id('res')), 'levée', 'réserve validée seulement une fois levée');
+update public.reserves set status = 'levee' where id = tests.id('res')::uuid;
+select tests.check((select lifted_on = current_date from public.reserves where id = tests.id('res')::uuid), 'date de levée posée');
+update public.reserves set status = 'validee' where id = tests.id('res')::uuid;
+select tests.fails(format('update public.reserves set title = ''x'' where id = %L', tests.id('res')), 'ne se modifie plus', 'réserve validée figée');
+select tests.login('00000000-0000-0000-0000-00000000000a');
+select tests.check((select count(*) from public.tasks) = 0 and (select count(*) from public.daily_reports) = 0 and (select count(*) from public.reserves) = 0, 'isolation : A ne voit ni le planning, ni les rapports, ni les réserves de B');
+select tests.fails(format('insert into public.tasks (org_id, project_id, title, start_date, end_date) values (%L, %L, ''X'', ''2026-11-10'', ''2026-11-11'')', tests.id('org2'), tests.id('prj')), 'row-level security', 'A ne crée pas de tâche chez B');
+select tests.fails(format('insert into public.tasks (org_id, project_id, title, start_date, end_date) values (%L, (select id from public.projects where name = ''Villa Fidjrossè''), ''X'', ''2026-11-10'', ''2026-11-11'')', tests.id('org1')), 'row-level security', 'planning hors de l''offre Découverte : refusé');
+
 -- ------------------------------------------------------------ double authentification
 reset role;
 insert into auth.mfa_factors (user_id, status) values ('00000000-0000-0000-0000-00000000000b', 'verified');

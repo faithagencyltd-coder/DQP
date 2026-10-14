@@ -19,6 +19,8 @@ Trois niveaux de tests automatisés, plus une recette manuelle.
 - `tests/finance.test.ts` et `tests/purchasing.test.ts` : acompte, situation, solde, avoir, échéances,
   rentabilité du chantier ; total de commande, valeur reçue, rapprochement avec la facture du fournisseur,
   alertes de réapprovisionnement.
+- `tests/planning.test.ts` : durées, retards, grille du calendrier, dépendances non respectées, avancement
+  par tâches (66,7 %), par quantités (70 %, tâche sans quantité exclue), pondéré (40 %), avancement prévu.
 - `tests/rendu-ia.test.ts` : fonction serveur du rendu IA — session et propriétaire vérifiés, absence de
   clé = échec explicite et unités restituées, succès (image déposée, demande close), échec du
   fournisseur sans fuite de secret, consigne (géométrie conservée, aucun texte), format des requêtes
@@ -27,7 +29,7 @@ Trois niveaux de tests automatisés, plus une recette manuelle.
 ## 2. Sécurité et règles de la base — `sh supabase/tests/run.sh`
 
 Applique les migrations sur un PostgreSQL vierge, avec un environnement qui imite Supabase
-(`supabase/tests/shim_supabase.sql`), puis exécute `supabase/tests/rls_test.sql` : 146 contrôles, parmi lesquels :
+(`supabase/tests/shim_supabase.sql`), puis exécute `supabase/tests/rls_test.sql` : 170 contrôles, parmi lesquels :
 isolation entre entreprises (lecture, écriture, fichiers, journal), permissions par rôle et matrice
 modifiable, invitations, limites d’offre, abonnement échu en lecture seule, versions verrouillées, métré
 approuvé figé, historique des prix, demandes d’abonnement, administration sans accès au contenu,
@@ -36,7 +38,9 @@ double authentification, plans (isolation, module selon l’offre, fichiers d’
 seul le serveur clôt un rendu, 3 rendus simultanés au plus, demandes abandonnées restituées, journal),
 finances (totaux recalculés par le serveur, numérotation FAC / AVO à l’émission, facture émise figée,
 paiement limité au reste dû), achats et stocks (commande validée figée, réception partielle, stock négatif
-refusé, transfert, inventaire, isolation).
+refusé, transfert, inventaire, isolation), planning (dépendances sans boucle, validation après « terminé »,
+rapport journalier toujours créé en brouillon, un par jour, photos rangées dans l’entreprise, rapport validé
+figé, réserve validée seulement une fois levée, isolation, module hors offre refusé).
 
 ```bash
 PGHOST=/chemin/socket PGPORT=5432 sh supabase/tests/run.sh   # utilisateur « postgres »
@@ -46,12 +50,15 @@ PGHOST=/chemin/socket PGPORT=5432 sh supabase/tests/run.sh   # utilisateur « po
 
 Pilote un vrai navigateur sur une pile locale (`scripts/local-stack/`) : PostgreSQL avec les migrations,
 PostgREST, et une passerelle qui joue l’authentification, le stockage et la fonction serveur de Supabase.
-47 étapes : inscription, confirmation, entreprise, client, doublon, projet et lots, article et ouvrage composé,
+53 étapes : inscription, confirmation, entreprise, client, doublon, projet et lots, article et ouvrage composé,
 métré, DQE, devis, PDF, Excel, validation, nouvelle version, invitation d’un métreur sur téléphone,
 permissions, demande d’abonnement (offre Professionnelle), activation par l’administration ; facture
 d’acompte depuis le devis, émission, paiement partiel, PDF, dépense, onglet Finances du chantier ; dépôts,
 demande d’achat approuvée, bon de commande (480 000), réception partielle, transfert, sortie refusée au-delà
-du stock, inventaire avec écart, alerte sous le minimum, journal des mouvements ; puis plans :
+du stock, inventaire avec écart, alerte sous le minimum, journal des mouvements ; planning (quatre tâches,
+dépendance non respectée et retard signalés, validation, avancement 25 %), rapport journalier avec effectifs,
+sorties de stock reprises, photo, soumission, validation et PDF, réserve levée puis validée, fiche chantier ;
+puis plans :
 dessin (murs, cloison à la longueur saisie, porte, fenêtre), détection des pièces (26,18 m² et 32,98 m²),
 aménagement, rendu fidèle (PDF, DXF), rendu IA, métré tiré du plan, import d’un plan scanné, calibration,
 détection sur les traits de l’image, éditeur sur téléphone ; enfin tableau de bord et journal.

@@ -39,7 +39,7 @@ export interface Contact {
 export interface Project {
   id: string; org_id: string; reference: string; name: string; client_id: string | null; project_type: string; location: string | null;
   city: string | null; country: string | null; description: string | null; start_date: string | null; end_date: string | null;
-  manager_id: string | null; budget_estimate: number | null; budget_validated: number | null; budget_revised?: number | null; margin_target_pct?: number | null; status: string;
+  manager_id: string | null; budget_estimate: number | null; budget_validated: number | null; budget_revised?: number | null; margin_target_pct?: number | null; progress_method?: 'taches' | 'quantites' | 'ponderation'; status: string;
   archived_at: string | null; created_at: string; updated_at: string;
 }
 
@@ -139,3 +139,24 @@ export interface PurchaseOrder {
   validated_at: string | null; created_at: string; updated_at: string;
 }
 export interface PurchaseReceipt { id: string; order_id: string; received_on: string; warehouse_id: string | null; lines: { line_id: string; qty: number }[]; note: string | null; created_at: string }
+
+export interface Task {
+  id: string; org_id: string; project_id: string; title: string; lot: string | null; assignee_id: string | null; assignee_label: string | null;
+  start_date: string; end_date: string; status: 'a_faire' | 'en_cours' | 'en_attente' | 'bloque' | 'termine' | 'valide';
+  priority: 'basse' | 'normale' | 'haute' | 'urgente'; depends_on: string[]; planned_qty: number | null; done_qty: number | null; unit: string | null;
+  weight: number | null; progress_pct: number | null; observations: string | null; validated_by: string | null; validated_at: string | null;
+  created_at: string; updated_at: string;
+}
+export interface Photo { path: string; caption?: string | null }
+export interface DailyReport {
+  id: string; org_id: string; project_id: string; reference: string; report_date: string; weather: string | null; conditions: string | null;
+  work_done: string | null; workforce: { role: string; count: number }[]; materials: string | null; equipment: string | null; incidents: string | null;
+  delays: string | null; observations: string | null; photos: Photo[]; status: 'brouillon' | 'soumis' | 'valide';
+  submitted_by: string | null; submitted_at: string | null; validated_by: string | null; validated_at: string | null; validation_note: string | null;
+  created_by: string | null; created_at: string; updated_at: string;
+}
+export interface Reserve {
+  id: string; org_id: string; project_id: string; reference: string; title: string; description: string | null; location: string | null; lot: string | null;
+  assignee_label: string | null; due_date: string | null; status: 'ouverte' | 'en_cours' | 'levee' | 'validee'; photos: Photo[];
+  raised_on: string; lifted_on: string | null; lift_note: string | null; validated_by: string | null; validated_at: string | null; created_at: string;
+}

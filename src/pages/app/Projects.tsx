@@ -8,6 +8,7 @@ import { personName, useTeam } from '../../lib/team';
 import type { Contact, MetreDoc, Project, ProjectLot, Quote } from '../../lib/types';
 import { formatMoney, parseNumber } from '../../engine/money';
 import { Badge, Button, Card, Checkbox, Confirm, DataTable, EmptyState, Field, Input, KeyValue, Modal, Notice, PageHeader, SearchInput, Select, Spinner, Tabs, Textarea } from '../../ui';
+import { ProjectSite } from './ProjectSite';
 import { Allowed } from '../../ui/guard';
 import { ContactForm } from './Contacts';
 import { DocumentsPanel } from './Documents';
@@ -217,15 +218,7 @@ export function ProjectDetail() {
       {tab === 'finances' && <ProjectFinance project={x} />}
       {tab === 'documents' && <DocumentsPanel projectId={x.id} />}
       {tab === 'journal' && <Card title="Historique du projet"><ActivityList projectId={x.id} /></Card>}
-      {tab === 'gestion' && (
-        <Card title="Gestion de chantier">
-          <p className="text-[14px] text-ink-2">Les rubriques suivantes de la fiche chantier arrivent avec la phase 5 du cahier des charges et ne sont pas encore disponibles :</p>
-          <ul className="mt-3 grid gap-1.5 text-[14px] text-ink-2 sm:grid-cols-2">
-            {['Achats et commandes', 'Matériaux et stocks', 'Équipe et planning', 'Photos et rapports journaliers', 'Réserves et observations', 'Documents de réception'].map((t) => <li key={t} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-signal-500" />{t}</li>)}
-          </ul>
-          <p className="mt-3 text-[13px] text-muted">Les photos, procès-verbaux et documents de réception peuvent déjà être déposés dans l’onglet Documents.</p>
-        </Card>
-      )}
+      {tab === 'gestion' && <ProjectSite project={x} />}
       {edit && <ProjectForm initial={x} onClose={() => setEdit(false)} />}
     </>
   );

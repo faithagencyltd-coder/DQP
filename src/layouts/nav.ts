@@ -31,7 +31,7 @@ export const NAV: NavItem[] = [
   { path: '/app/stocks', label: 'Stocks', icon: Boxes, module: 'stocks', group: 'gestion' },
   { path: '/app/factures', label: 'Facturation', icon: Receipt, module: 'factures', group: 'gestion' },
   { path: '/app/depenses', label: 'Dépenses', icon: Banknote, module: 'depenses', group: 'gestion' },
-  { path: '/app/planning', label: 'Planning', icon: CalendarRange, module: 'planning', group: 'gestion', soon: 'Phase 5' },
+  { path: '/app/planning', label: 'Planning', icon: CalendarRange, module: 'planning', group: 'gestion' },
   { path: '/app/documents', label: 'Documents et rapports', icon: FolderOpen, module: 'documents', group: 'gestion' },
   { path: '/app/assistant', label: 'Assistant IA', icon: Bot, group: 'gestion', soon: 'Phase 4' },
   { path: '/app/abonnement', label: 'Abonnement', icon: CreditCard, group: 'compte' },

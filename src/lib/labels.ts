@@ -146,3 +146,22 @@ export const ORDER_STATUS: Record<string, { label: string; tone: 'grey' | 'navy'
 export const MOVE_KIND: Record<string, string> = {
   entree: 'Entrée', sortie: 'Sortie (affectation chantier)', transfert: 'Transfert', inventaire: 'Inventaire', ajustement: 'Ajustement', reception: 'Réception de commande',
 };
+
+type Tone6 = 'grey' | 'navy' | 'signal' | 'ok' | 'warn' | 'bad';
+export const TASK_STATUS: Record<string, { label: string; tone: Tone6; color: string }> = {
+  a_faire: { label: 'À faire', tone: 'grey', color: '#94a3b8' },
+  en_cours: { label: 'En cours', tone: 'navy', color: '#2563eb' },
+  en_attente: { label: 'En attente', tone: 'warn', color: '#d97706' },
+  bloque: { label: 'Bloqué', tone: 'bad', color: '#dc2626' },
+  termine: { label: 'Terminé', tone: 'ok', color: '#16a34a' },
+  valide: { label: 'Validé', tone: 'ok', color: '#0f766e' },
+};
+export const TASK_PRIORITY: Record<string, { label: string; tone: Tone6 }> = {
+  basse: { label: 'Basse', tone: 'grey' }, normale: { label: 'Normale', tone: 'navy' }, haute: { label: 'Haute', tone: 'warn' }, urgente: { label: 'Urgente', tone: 'bad' },
+};
+export const REPORT_STATUS: Record<string, { label: string; tone: Tone6 }> = {
+  brouillon: { label: 'Brouillon', tone: 'grey' }, soumis: { label: 'À valider', tone: 'warn' }, valide: { label: 'Validé', tone: 'ok' },
+};
+export const RESERVE_STATUS: Record<string, { label: string; tone: Tone6 }> = {
+  ouverte: { label: 'Ouverte', tone: 'bad' }, en_cours: { label: 'En cours de levée', tone: 'warn' }, levee: { label: 'Levée', tone: 'navy' }, validee: { label: 'Levée et validée', tone: 'ok' },
+};
