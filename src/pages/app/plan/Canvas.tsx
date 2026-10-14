@@ -10,6 +10,7 @@ import {
   wallDir, wallEndExtensions, wallLength, wallNormal, wallSolidSpans, wallSpanPolygon,
 } from '../../../engine/plan/model';
 import { openingSvg, THEMES } from '../../../engine/plan/render';
+import { paletteDefs, specialDefs, textureDefs } from '../../../engine/plan/furniture';
 
 export type Tool = 'select' | 'mur' | 'ouverture' | 'piece' | 'piece_auto' | 'meuble' | 'cote' | 'texte' | 'mesure' | 'echelle';
 export type Sel = { kind: 'wall' | 'opening' | 'room' | 'item' | 'dim' | 'note'; id: string } | null;
@@ -53,6 +54,8 @@ const ROOM_COLORS: Record<RoomKind, string> = {
 };
 
 const theme = THEMES.moderne;
+// Dégradés et textures du mobilier, partagés avec le rendu.
+const EDIT_DEFS = paletteDefs(theme.palette) + textureDefs() + specialDefs();
 
 export function PlanCanvas(p: Props) {
   const { model } = p;
@@ -478,6 +481,7 @@ export function PlanCanvas(p: Props) {
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
         onPointerLeave={() => setHover(null)} onWheel={onWheel} onDoubleClick={() => finishDraft()} onContextMenu={(e) => e.preventDefault()}>
         <defs>
+          <g dangerouslySetInnerHTML={{ __html: EDIT_DEFS }} />
           <pattern id="grid1" width="1" height="1" patternUnits="userSpaceOnUse"><path d="M 1 0 L 0 0 0 1" fill="none" stroke="#d9dde3" strokeWidth={px(1)} /></pattern>
         </defs>
         <rect x={view.x0} y={view.y0} width={size.w / view.s} height={size.h / view.s} fill="url(#grid1)" />

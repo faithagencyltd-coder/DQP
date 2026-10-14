@@ -233,6 +233,10 @@ select tests.check((select count(*) from public.activity_log where org_id = test
 
 -- ------------------------------------------------------------ plans et rendus IA
 select tests.login('00000000-0000-0000-0000-00000000000b');
+select tests.check(not public.feature_enabled('rendu_plan_ia'), 'rendu IA désactivé par défaut');
+select tests.fails('select public.admin_set_feature(''rendu_plan_ia'', true)', 'Réservé', 'seule la plateforme active une fonction IA');
+select tests.fails('update public.platform_features set enabled = true', 'permission denied', 'le client ne réactive pas une fonction IA');
+select tests.login('00000000-0000-0000-0000-00000000000b');
 with x as (insert into public.plans (org_id, name, level, data) values (tests.id('org2')::uuid, 'Villa R+1', 'RDC', '{"v":1}') returning id)
 insert into tests.ids select 'plan', id from x;
 select tests.check((select reference from public.plans where id = tests.id('plan')::uuid) like 'PLN-____-0001', 'plan numéroté automatiquement');
@@ -250,6 +254,10 @@ update public.plans set status = 'travail' where id = tests.id('plan')::uuid;
 select tests.fails(format('update public.plans set reference = ''X'' where id = %L', tests.id('plan')), 'permission denied', 'référence de plan non modifiable');
 select tests.fails(format('select * from public.request_plan_render(%L, ''plan_importe'', ''moderne'')', tests.id('plan')), 'pas de fichier importé', 'rendu depuis le fichier importé : fichier requis');
 
+select tests.fails(format('select * from public.request_plan_render(%L, ''rendu_fidele'', ''moderne'')', tests.id('plan')), 'désactivé', 'rendu IA refusé tant que la plateforme ne l''a pas ouvert');
+select tests.login('00000000-0000-0000-0000-00000000000a');
+select public.admin_set_feature('rendu_plan_ia', true);
+select tests.login('00000000-0000-0000-0000-00000000000b');
 insert into tests.ids select 'r1', render_id from public.request_plan_render(tests.id('plan')::uuid, 'rendu_fidele', 'moderne', '{"width":1536}');
 select tests.check((select used = 10 and remaining = quota - 10 from public.ai_quota_status(tests.id('org2')::uuid)), 'unités IA réservées à la demande');
 select tests.check((select status = 'en_attente' and input_path like tests.id('org2') || '/plans-techniques/%/ia/%' from public.plan_renders where id = tests.id('r1')::uuid), 'demande de rendu enregistrée en attente');

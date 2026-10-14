@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { errorMessage } from '../../lib/errors';
 import { COUNTRIES, MODULE_LABEL, fmtDate, fmtDateTime } from '../../lib/labels';
 import { useAuth } from '../../lib/session';
+import { useFeatures } from '../../lib/features';
 import type { Module, Organization, Plan } from '../../lib/types';
 import { formatMoney, parseNumber } from '../../engine/money';
 import { Badge, Button, Card, Checkbox, DataTable, Field, Input, Modal, Notice, PageHeader, SearchInput, Select, Spinner, Stat, Tabs, Textarea, useToast } from '../../ui';
@@ -16,7 +17,7 @@ interface Req { id: string; org_id: string; plan_id: string; period: string; amo
 
 export function AdminPage() {
   const { isPlatformAdmin, adminLoading, session } = useAuth();
-  const [tab, setTab] = useState<'entreprises' | 'demandes' | 'offres'>('entreprises');
+  const [tab, setTab] = useState<'entreprises' | 'demandes' | 'offres' | 'ia'>('entreprises');
   const overview = useQuery({ queryKey: ['admin-overview'], enabled: isPlatformAdmin, queryFn: async () => {
     const { data, error } = await supabase.rpc('admin_overview');
     if (error) throw error;
@@ -41,12 +42,38 @@ export function AdminPage() {
         <Stat label="Stockage utilisé" value={o ? `${String(o.storage_mb).replace('.', ',')} Mo` : '…'} hint={o ? `${o.expired} abonnement(s) échu(s)` : undefined} />
         <Stat label="Consommation IA du mois" value={ai.data ? `${ai.data.units_month} unités` : '…'} hint={ai.data ? `${ai.data.renders_ok} rendu(s) réussi(s), ${ai.data.renders_failed} échec(s)` : undefined} />
       </div>
-      <Tabs value={tab} onChange={setTab} items={[{ id: 'entreprises', label: 'Entreprises' }, { id: 'demandes', label: 'Demandes d’abonnement' }, { id: 'offres', label: 'Offres' }]} />
+      <Tabs value={tab} onChange={setTab} items={[{ id: 'entreprises', label: 'Entreprises' }, { id: 'demandes', label: 'Demandes d’abonnement' }, { id: 'offres', label: 'Offres' }, { id: 'ia', label: 'Fonctions IA' }]} />
       {tab === 'entreprises' && <Orgs />}
       {tab === 'demandes' && <Requests />}
       {tab === 'offres' && <Plans />}
+      {tab === 'ia' && <Features />}
       <Notice tone="navy" className="mt-4" title="Non disponible dans cette version">Revenus encaissés en ligne, paiements échoués, consommation IA, incidents et demandes d’assistance : avec les modules Paiement, Assistant IA et Support.</Notice>
     </>
+  );
+}
+
+function Features() {
+  const qc = useQueryClient();
+  const features = useFeatures();
+  const toggle = useAction(({ key, enabled }: { key: string; enabled: boolean }) => rpc('admin_set_feature', { p_key: key, p_enabled: enabled }), { success: 'Réglage enregistré.', invalidate: [['platform-features']] });
+  void qc;
+  return (
+    <Card title="Fonctions d’intelligence artificielle" subtitle="Désactivées par défaut. Une fonction ouverte ici l’est pour toutes les entreprises, dans la limite de leur quota IA.">
+      {features.isLoading ? <Spinner /> : (
+        <ul className="grid gap-3">
+          {(features.data ?? []).map((f) => (
+            <li key={f.key} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line p-3">
+              <div>
+                <div className="font-semibold">{f.label}</div>
+                <div className="text-[12.5px] text-muted">{f.enabled ? 'Ouverte' : 'Fermée'}{f.updated_by ? ` · modifié par ${f.updated_by} le ${fmtDateTime(f.updated_at)}` : ''}</div>
+              </div>
+              <Checkbox label={f.enabled ? 'Activée' : 'Désactivée'} checked={f.enabled} onChange={(v) => toggle.mutate({ key: f.key, enabled: v })} />
+            </li>
+          ))}
+        </ul>
+      )}
+      <Notice tone="navy" className="mt-3">Avant d’ouvrir une fonction IA : configurer la clé du fournisseur (voir docs/DEPLOIEMENT.md), vérifier ses conditions de confidentialité et ajuster les quotas des offres.</Notice>
+    </Card>
   );
 }
 

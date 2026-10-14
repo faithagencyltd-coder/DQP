@@ -21,6 +21,7 @@ import { errorMessage } from '../../../lib/errors';
 import { WORK_STATUS, fmtDateTime } from '../../../lib/labels';
 import { DEFAULT_MPP_IMAGE, DEFAULT_MPP_PDF, downloadPrivate, loadBackground, sampleBackground, type LoadedBackground } from '../../../lib/plan-files';
 import { useOrg } from '../../../lib/session';
+import { useFeatures } from '../../../lib/features';
 import { supabase } from '../../../lib/supabase';
 import type { MetreDoc, PlanDoc, Project } from '../../../lib/types';
 import { parseNumber } from '../../../engine/money';
@@ -69,6 +70,7 @@ export function PlanEditor() {
 
 function Editor({ plan }: { plan: PlanDoc }) {
   const { org, can } = useOrg();
+  const features = useFeatures();
   const toast = useToast();
   const qc = useQueryClient();
   const nav = useNavigate();
@@ -330,7 +332,7 @@ function Editor({ plan }: { plan: PlanDoc }) {
         </div>
         <div className="min-w-0 rounded-lg border border-line bg-white">
           <div className="border-b border-line-2 px-2 pt-2">
-            <Tabs<Tab> value={tab} onChange={setTab} items={[{ id: 'element', label: 'Élément' }, { id: 'plan', label: 'Plan' }, { id: 'rendu', label: 'Rendu' }, { id: 'ia', label: 'Rendu IA' }]} />
+            <Tabs<Tab> value={tab} onChange={setTab} items={[{ id: 'element', label: 'Élément' }, { id: 'plan', label: 'Plan' }, { id: 'rendu', label: 'Rendu' }, { id: 'ia', label: 'Rendu IA', hidden: !features.enabled('rendu_plan_ia') }]} />
           </div>
           <div className="max-h-[calc(100vh-250px)] overflow-y-auto p-3">
             {tab === 'element' && (sel
@@ -345,7 +347,7 @@ function Editor({ plan }: { plan: PlanDoc }) {
               </div>)}
             {tab === 'plan' && <PlanSettings model={m} meta={meta} readOnly={readOnly} commit={commit} bg={bg} onMeta={updateMeta} onCalibrate={() => { setTool('echelle'); setTab('element'); }} />}
             {tab === 'rendu' && <RenderPanel model={m} plan={meta} project={project} settings={settings} onSettings={setSettings} onFurnishAll={furnishAll} canFurnish={!readOnly} />}
-            {tab === 'ia' && <AiPanel model={m} plan={meta} bgUrl={bg?.url ?? null} bgSize={bg ? { w: bg.widthPx, h: bg.heightPx } : null} settings={settings} />}
+            {tab === 'ia' && features.enabled('rendu_plan_ia') && <AiPanel model={m} plan={meta} bgUrl={bg?.url ?? null} bgSize={bg ? { w: bg.widthPx, h: bg.heightPx } : null} settings={settings} />}
           </div>
         </div>
       </div>

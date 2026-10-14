@@ -6,7 +6,7 @@
 // noms et cotes exacts posée ensuite sur l'image IA.
 
 import { autoDimChains, wallsExtent } from './dims';
-import { FURNITURE, type Palette } from './furniture';
+import { FURNITURE, paletteDefs, specialDefs, textureDefs, type Palette } from './furniture';
 import {
   add, bboxOf, type Box, formatArea, formatLength, itemCorners, labelPoint, mulp, type Opening, type PlanModel,
   pointInPolygon, polygonArea, type Pt, type Room, type RoomKind, sub, type Wall, wallDir, wallEndExtensions, wallLength, wallNormal,
@@ -37,7 +37,7 @@ export const THEMES: Record<RenderStyle, Theme> = {
     label: 'Moderne', description: 'Chêne clair, carrelage gris perle, murs anthracite.',
     paper: '#ffffff', wall: '#24272b', threshold: '#d9d4cc', text: '#1d2125', textMuted: '#4b525a', dim: '#3c4248', halo: '#ffffff',
     floors: {
-      parquet: { base: '#d8b98f', tones: ['#d4b285', '#dcc09a', '#cfac7f', '#e0c6a2', '#d6b68b'], joint: '#b8956a' },
+      parquet: { base: '#c9a273', tones: ['#c79e6d', '#d2ad7e', '#bf9462', '#d6b487', '#c49a68', '#cfa676'], joint: '#9c7a52' },
       carrelage: { base: '#dedcd8', tones: ['#e2e0dc', '#d9d7d2', '#dfddd9', '#d6d4cf'], joint: '#bdbab4' },
       carrelage_fin: { base: '#e9eef0', tones: ['#edf1f3', '#e4eaec', '#eaeff1'], joint: '#c4ccd0' },
       beton: { base: '#c9c7c3', tones: ['#bdbbb7', '#d1cfcb', '#c4c2be'], joint: '#b3b1ad' },
@@ -46,8 +46,8 @@ export const THEMES: Record<RenderStyle, Theme> = {
       uni: { base: '#efeeec', tones: ['#efeeec'], joint: '#dcdad6' },
     },
     palette: {
-      wood: '#b98d5f', woodDark: '#7b5a3c', fabric: '#c9c2b8', fabricDark: '#a79f94', cushion: '#e5ded3', linen: '#f4f1ec', white: '#fbfbfa',
-      metal: '#c4c9ce', plant: '#5f8f4e', plantDark: '#3f6e34', glass: '#cfe3ec', line: '#5a5f66', car: '#d9dde1', rug: '#e9e2d6',
+      id: 'moderne', wood: '#b08a5e', woodDark: '#6e5038', fabric: '#bdb6ab', fabricDark: '#9c958a', cushion: '#ddd7cc', linen: '#f2efea', white: '#fbfbf9',
+      metal: '#c9cdd1', plant: '#5d8c45', plantDark: '#2f5e2a', glass: '#bcd6e2', line: '#4a4f55', car: '#c3c8cd', rug: '#d8d0c3', accent: '#7c8c6e', accent2: '#c58a5a', stone: '#e4e1db',
     },
     shadows: true,
   },
@@ -64,8 +64,8 @@ export const THEMES: Record<RenderStyle, Theme> = {
       uni: { base: '#f3ede4', tones: ['#f3ede4'], joint: '#e0d6c8' },
     },
     palette: {
-      wood: '#a8743f', woodDark: '#6b4423', fabric: '#c79a72', fabricDark: '#a3764f', cushion: '#e8c9a4', linen: '#f6efe4', white: '#fcfaf6',
-      metal: '#c6c1b9', plant: '#6b9150', plantDark: '#486f33', glass: '#d6e6ea', line: '#5e4b3f', car: '#b5452f', rug: '#d9b48c',
+      id: 'chaleureux', wood: '#a06b3c', woodDark: '#5e3b20', fabric: '#c49a6c', fabricDark: '#9d7550', cushion: '#ead2b4', linen: '#f7efe3', white: '#fdfaf5',
+      metal: '#c8c2b8', plant: '#628c45', plantDark: '#335f26', glass: '#cde0e6', line: '#5a473b', car: '#a63a28', rug: '#c9a27a', accent: '#b5532f', accent2: '#e0b34c', stone: '#e8dccb',
     },
     shadows: true,
   },
@@ -82,8 +82,8 @@ export const THEMES: Record<RenderStyle, Theme> = {
       uni: { base: '#f4f3f1', tones: ['#f4f3f1'], joint: '#dedcd8' },
     },
     palette: {
-      wood: '#4f3322', woodDark: '#2e1d13', fabric: '#d8d2c8', fabricDark: '#9a8f80', cushion: '#c6a76a', linen: '#f7f5f0', white: '#ffffff',
-      metal: '#b8b2a6', plant: '#4f7f42', plantDark: '#2f5a27', glass: '#d3e3e8', line: '#3a3a3a', car: '#1f2326', rug: '#d9d3c7',
+      id: 'luxe', wood: '#5a3b27', woodDark: '#2c1c12', fabric: '#d9d3c9', fabricDark: '#8f8577', cushion: '#efe9df', linen: '#f8f6f2', white: '#ffffff',
+      metal: '#c2b59b', plant: '#4c7d3d', plantDark: '#264f22', glass: '#c7dbe2', line: '#2f2f2f', car: '#1d2226', rug: '#cfc6b8', accent: '#1f3b4d', accent2: '#b08d57', stone: '#f1efea',
     },
     shadows: true,
   },
@@ -100,8 +100,8 @@ export const THEMES: Record<RenderStyle, Theme> = {
       uni: { base: '#ffffff', tones: ['#ffffff'], joint: '#dddddd' },
     },
     palette: {
-      wood: '#ffffff', woodDark: '#e6e6e6', fabric: '#ffffff', fabricDark: '#ededed', cushion: '#f5f5f5', linen: '#ffffff', white: '#ffffff',
-      metal: '#f0f0f0', plant: '#e8e8e8', plantDark: '#cfcfcf', glass: '#f4f4f4', line: '#1a1a1a', car: '#ffffff', rug: '#f6f6f6',
+      id: 'epure', flat: true, wood: '#ffffff', woodDark: '#e6e6e6', fabric: '#ffffff', fabricDark: '#ededed', cushion: '#f5f5f5', linen: '#ffffff', white: '#ffffff',
+      metal: '#f0f0f0', plant: '#e8e8e8', plantDark: '#cfcfcf', glass: '#f4f4f4', line: '#1a1a1a', car: '#ffffff', rug: '#f6f6f6', accent: '#f2f2f2', accent2: '#eeeeee', stone: '#fafafa',
     },
     shadows: false,
   },
@@ -435,7 +435,10 @@ function planBody(m: PlanModel, o: RenderOptions, t: Theme, defs: string[]): str
       const rotate = kind === 'parquet' && b.maxY - b.minY > b.maxX - b.minX;
       const pid = `f-${o.style}-${kind}-${rotate ? 'v' : 'h'}`;
       if (!defs.some((d) => d.includes(`id="${pid}"`))) defs.push(floorPattern(pid, kind, t.floors[kind], rotate));
-      floors.push(`<polygon points="${poly(r.points)}" fill="url(#${pid})"/>`);
+      // Texture fine du matériau (veinage, grain du béton, herbe) ; aucune en style épuré.
+      const fx = !t.shadows ? '' : kind === 'parquet' ? (rotate ? 'f-grain-v' : 'f-grain-h') : kind === 'carrelage' && o.style === 'luxe' ? 'f-marble'
+        : kind === 'carrelage' || kind === 'carrelage_fin' ? 'f-tile' : kind === 'beton' ? 'f-concrete' : kind === 'dallage' ? 'f-stone' : kind === 'gazon' ? 'f-grass' : '';
+      floors.push(`<polygon points="${poly(r.points)}" fill="url(#${pid})"${fx ? ` filter="url(#${fx})"` : ''}/>`);
     }
   }
   // Ombre portée du bâtiment (effet « maquette » des plans de présentation).
@@ -478,11 +481,20 @@ function planBody(m: PlanModel, o: RenderOptions, t: Theme, defs: string[]): str
   return s;
 }
 
+function grainFilter(id: string, freq: string, lo: number, oct = 3, type = 'fractalNoise'): string {
+  return `<filter id="${id}" x="0" y="0" width="1" height="1" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">` +
+    `<feTurbulence type="${type}" baseFrequency="${freq}" numOctaves="${oct}" seed="11" result="n"/>` +
+    `<feColorMatrix in="n" type="matrix" values="${1 - lo} 0 0 0 ${lo}  ${1 - lo} 0 0 0 ${lo}  ${1 - lo} 0 0 0 ${lo}  0 0 0 0 1" result="m"/>` +
+    `<feBlend in="SourceGraphic" in2="m" mode="multiply" result="b"/><feComposite in="b" in2="SourceAlpha" operator="in"/></filter>`;
+}
+
 function filtersDefs(): string {
-  return `<linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.5"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.06"/></linearGradient>
+  return grainFilter('f-grain-h', '1.4 34', 0.8) + grainFilter('f-grain-v', '34 1.4', 0.8) + grainFilter('f-tile', '5 5', 0.92, 2) +
+    grainFilter('f-concrete', '6 6', 0.8, 4) + grainFilter('f-stone', '3 3', 0.84) + grainFilter('f-grass', '22 22', 0.68, 3) +
+    grainFilter('f-marble', '0.8 1.1', 0.86, 4, 'turbulence') + textureDefs() + specialDefs() + `<linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.5"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.06"/></linearGradient>
 <filter id="ground" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="0.22"/></filter>
 <filter id="inner" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="0.09"/></filter>
-<filter id="drop" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0.03" dy="0.05" stdDeviation="0.04" flood-color="#000" flood-opacity="0.28"/></filter>
+<filter id="drop" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0.05" dy="0.08" stdDeviation="0.07" flood-color="#000" flood-opacity="0.3"/><feDropShadow dx="0.01" dy="0.015" stdDeviation="0.012" flood-color="#000" flood-opacity="0.25"/></filter>
 <filter id="wallshadow" x="-10%" y="-10%" width="120%" height="120%"><feDropShadow dx="0.035" dy="0.05" stdDeviation="0.035" flood-color="#000" flood-opacity="0.35"/></filter>`;
 }
 
@@ -532,7 +544,7 @@ export function renderPlanSvg(m: PlanModel, opts: Partial<RenderOptions> = {}): 
     return { svg: `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 4 3"><rect width="4" height="3" fill="${t.paper}"/></svg>`, frame, warnings };
   }
   const { content, base } = lay;
-  const defs: string[] = [filtersDefs()];
+  const defs: string[] = [filtersDefs(), paletteDefs(t.palette)];
   const body = planBody(m, o, t, defs);
 
   let x0: number, y0: number, wM: number, hM: number;

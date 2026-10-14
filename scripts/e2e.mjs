@@ -287,6 +287,15 @@ try {
   await page3.getByRole('tab', { name: 'Entreprises' }).click();
   await shot(page3, '14-administration');
   ok('administration : offre activée après règlement');
+  await page3.getByRole('tab', { name: 'Fonctions IA' }).click();
+  const iaRow = page3.locator('li', { hasText: 'Rendu des plans par IA' });
+  await iaRow.getByText(/Ouverte|Fermée/).waitFor();
+  if (!(await iaRow.getByRole('checkbox').isChecked())) {
+    await iaRow.getByRole('checkbox').click();
+    await page3.getByText('Réglage enregistré.').waitFor();
+  }
+  await iaRow.getByText(/^Ouverte/).waitFor();
+  ok('administration : rendu IA des plans ouvert (désactivé par défaut)');
   await page.reload();
   await page.getByText('Actif').first().waitFor();
   ok('l’entreprise voit son offre active');

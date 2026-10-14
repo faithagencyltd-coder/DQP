@@ -8,6 +8,10 @@ import {
 } from './model';
 
 export interface Palette {
+  /** Identifiant du style (sert à nommer les dégradés dans le SVG). */
+  id: string;
+  /** Rendu à plat, sans dégradés ni textures (style « Épuré », impression). */
+  flat?: boolean;
   wood: string;
   woodDark: string;
   fabric: string;
@@ -22,6 +26,10 @@ export interface Palette {
   line: string;
   car: string;
   rug: string;
+  /** Couleurs d'accent : coussins, plaid, objets. */
+  accent: string;
+  accent2: string;
+  stone: string;
 }
 
 export type FurnitureCategory = 'chambre' | 'sejour' | 'cuisine' | 'sanitaire' | 'bureau' | 'exterieur' | 'structure';
@@ -37,80 +45,253 @@ export interface FurnitureDef {
   under?: boolean;
 }
 
+// ------------------------------------------------------------------ outils de dessin
 const f = (n: number) => (Math.round(n * 1000) / 1000).toString();
-const rect = (x: number, y: number, w: number, h: number, fill: string, stroke = 'none', r = 0, sw = 0.01) =>
-  `<rect x="${f(x)}" y="${f(y)}" width="${f(Math.max(0, w))}" height="${f(Math.max(0, h))}" rx="${f(r)}" fill="${fill}" stroke="${stroke}" stroke-width="${f(sw)}"/>`;
-const circle = (cx: number, cy: number, r: number, fill: string, stroke = 'none', sw = 0.01) =>
-  `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${fill}" stroke="${stroke}" stroke-width="${f(sw)}"/>`;
-const ellipse = (cx: number, cy: number, rx: number, ry: number, fill: string, stroke = 'none', sw = 0.01) =>
-  `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="${fill}" stroke="${stroke}" stroke-width="${f(sw)}"/>`;
+const rect = (x: number, y: number, w: number, h: number, fill: string, stroke = 'none', r = 0, sw = 0.01, extra = '') =>
+  `<rect x="${f(x)}" y="${f(y)}" width="${f(Math.max(0, w))}" height="${f(Math.max(0, h))}" rx="${f(Math.min(r, Math.max(0, w) / 2, Math.max(0, h) / 2))}" fill="${fill}" stroke="${stroke}" stroke-width="${f(sw)}" ${extra}/>`;
+const circle = (cx: number, cy: number, r: number, fill: string, stroke = 'none', sw = 0.01, extra = '') =>
+  `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${fill}" stroke="${stroke}" stroke-width="${f(sw)}" ${extra}/>`;
+const ellipse = (cx: number, cy: number, rx: number, ry: number, fill: string, stroke = 'none', sw = 0.01, extra = '') =>
+  `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="${fill}" stroke="${stroke}" stroke-width="${f(sw)}" ${extra}/>`;
 const line = (x1: number, y1: number, x2: number, y2: number, stroke: string, sw = 0.01, extra = '') =>
   `<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="${stroke}" stroke-width="${f(sw)}" ${extra}/>`;
+const path = (d: string, fill: string, stroke = 'none', sw = 0.01, extra = '') => `<path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${f(sw)}" ${extra}/>`;
+const g = (x: number, y: number, rot: number, body: string) => `<g transform="translate(${f(x)} ${f(y)})${rot ? ` rotate(${f(rot)})` : ''}">${body}</g>`;
 
+type Key = Exclude<keyof Palette, 'id' | 'flat'>;
+const GRAD_KEYS: Key[] = ['wood', 'woodDark', 'fabric', 'fabricDark', 'cushion', 'linen', 'white', 'metal', 'plant', 'plantDark', 'glass', 'car', 'rug', 'accent', 'accent2', 'stone'];
+
+/** Volume doux (coussins, matelas, carrosserie) : centre éclairé, bords ombrés. */
+const S = (p: Palette, k: Key) => (p.flat ? p[k] : `url(#s-${p.id}-${k})`);
+/** Surface plane éclairée de biais (bois, métal, verre). */
+const L = (p: Palette, k: Key) => (p.flat ? p[k] : `url(#l-${p.id}-${k})`);
+/** Texture fine (veinage du bois, trame du tissu) ; rien en rendu à plat. */
+const T = (p: Palette, kind: 'bois' | 'tissu' | 'pierre') => (p.flat ? '' : ` filter="url(#t-${kind})"`);
+const stroke = (p: Palette) => (p.flat ? p.line : 'rgba(0,0,0,0.28)');
+
+function hex(c: string): [number, number, number] | null {
+  const m = /^#([0-9a-f]{6})$/i.exec(c);
+  if (!m) return null;
+  const v = parseInt(m[1], 16);
+  return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+}
+/** Éclaircit (k > 0) ou assombrit (k < 0) une couleur. */
+export function shade(c: string, k: number): string {
+  const rgb = hex(c);
+  if (!rgb) return c;
+  const t = k > 0 ? 255 : 0;
+  const a = Math.abs(k);
+  return '#' + rgb.map((v) => Math.round(v + (t - v) * a).toString(16).padStart(2, '0')).join('');
+}
+
+/** Dégradés et textures utilisés par le mobilier d'un style (à placer dans <defs>). */
+export function paletteDefs(p: Palette): string {
+  if (p.flat) return '';
+  let s = '';
+  for (const k of GRAD_KEYS) {
+    const c = p[k];
+    s += `<radialGradient id="s-${p.id}-${k}" cx="0.45" cy="0.4" r="0.75"><stop offset="0" stop-color="${shade(c, 0.22)}"/><stop offset="0.55" stop-color="${c}"/><stop offset="1" stop-color="${shade(c, -0.22)}"/></radialGradient>`;
+    s += `<linearGradient id="l-${p.id}-${k}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${shade(c, 0.14)}"/><stop offset="0.6" stop-color="${c}"/><stop offset="1" stop-color="${shade(c, -0.12)}"/></linearGradient>`;
+  }
+  return s;
+}
+
+/** Textures fines communes à tous les styles (filtres SVG, unités en mètres). */
+export function textureDefs(): string {
+  const mul = (id: string, freq: string, lo: number, oct = 3, kind = 'fractalNoise') =>
+    `<filter id="${id}" x="0" y="0" width="1" height="1" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">` +
+    `<feTurbulence type="${kind}" baseFrequency="${freq}" numOctaves="${oct}" seed="7" result="n"/>` +
+    `<feColorMatrix in="n" type="matrix" values="${1 - lo} 0 0 0 ${lo}  ${1 - lo} 0 0 0 ${lo}  ${1 - lo} 0 0 0 ${lo}  0 0 0 0 1" result="m"/>` +
+    `<feBlend in="SourceGraphic" in2="m" mode="multiply" result="b"/><feComposite in="b" in2="SourceAlpha" operator="in"/></filter>`;
+  return mul('t-bois', '2 45', 0.8) + mul('t-tissu', '60 60', 0.88, 2) + mul('t-pierre', '9 9', 0.84, 4);
+}
+
+// ------------------------------------------------------------------ éléments réutilisés
+/** Chaise vue de dessus : assise rembourrée, dossier, pieds visibles. */
 function chair(cx: number, cy: number, s: number, rot: number, p: Palette): string {
-  return `<g transform="translate(${f(cx)} ${f(cy)}) rotate(${rot})">${rect(-s / 2, -s / 2, s, s, p.fabric, p.line, 0.05, 0.008)}${rect(-s / 2, -s / 2, s, s * 0.22, p.fabricDark, 'none', 0.04)}</g>`;
+  const back = s * 0.2;
+  return g(cx, cy, rot,
+    rect(-s / 2 + 0.02, -s / 2 + 0.02, s - 0.04, s - 0.02, 'rgba(0,0,0,0.12)', 'none', 0.06) +
+    rect(-s / 2, -s / 2 + back * 0.6, s, s - back * 0.6, S(p, 'fabric'), stroke(p), 0.07, 0.006, T(p, 'tissu')) +
+    rect(-s / 2, -s / 2, s, back, L(p, 'woodDark'), stroke(p), 0.04, 0.006));
+}
+
+function pillow(x: number, y: number, w: number, h: number, fill: string, p: Palette): string {
+  // Coussin bombé : coins pincés, pli central.
+  const r = Math.min(w, h) * 0.35;
+  return rect(x, y, w, h, fill, stroke(p), r, 0.005, T(p, 'tissu')) +
+    (p.flat ? '' : path(`M ${f(x + w * 0.2)} ${f(y + h * 0.55)} Q ${f(x + w / 2)} ${f(y + h * 0.4)} ${f(x + w * 0.8)} ${f(y + h * 0.55)}`, 'none', 'rgba(0,0,0,0.12)', 0.008));
 }
 
 function bed(w: number, d: number, p: Palette, pillows: number): string {
-  const head = 0.08;
-  let s = rect(-w / 2, -d / 2, w, d, p.woodDark, p.line, 0.03, 0.01);
-  s += rect(-w / 2 + 0.03, -d / 2 + head, w - 0.06, d - head - 0.03, p.linen, p.line, 0.04, 0.006);
-  const pw = (w - 0.12 - (pillows - 1) * 0.06) / pillows;
-  for (let i = 0; i < pillows; i++) s += rect(-w / 2 + 0.06 + i * (pw + 0.06), -d / 2 + head + 0.05, pw, 0.3, p.white, p.line, 0.06, 0.006);
-  // Couette repliée.
-  s += rect(-w / 2 + 0.03, -d / 2 + head + 0.48, w - 0.06, d - head - 0.51, p.cushion, p.line, 0.04, 0.006);
-  s += line(-w / 2 + 0.03, -d / 2 + head + 0.62, w / 2 - 0.03, -d / 2 + head + 0.62, p.line, 0.006, 'opacity="0.5"');
+  const head = 0.1;
+  let s = rect(-w / 2, -d / 2, w, d, L(p, 'woodDark'), stroke(p), 0.03, 0.01, T(p, 'bois'));
+  // Tête de lit capitonnée.
+  s += rect(-w / 2 + 0.01, -d / 2, w - 0.02, head, S(p, 'fabricDark'), stroke(p), 0.04, 0.006, T(p, 'tissu'));
+  // Matelas et drap.
+  s += rect(-w / 2 + 0.04, -d / 2 + head, w - 0.08, d - head - 0.04, S(p, 'linen'), stroke(p), 0.05, 0.006);
+  const pw = (w - 0.16 - (pillows - 1) * 0.05) / pillows;
+  for (let i = 0; i < pillows; i++) s += pillow(-w / 2 + 0.08 + i * (pw + 0.05), -d / 2 + head + 0.05, pw, 0.32, S(p, 'white'), p);
+  // Couette avec revers et plis.
+  const top = -d / 2 + head + 0.46;
+  s += path(`M ${f(-w / 2 + 0.03)} ${f(top)} L ${f(w / 2 - 0.03)} ${f(top)} L ${f(w / 2 - 0.02)} ${f(d / 2 - 0.03)} Q ${f(0)} ${f(d / 2 + 0.01)} ${f(-w / 2 + 0.02)} ${f(d / 2 - 0.03)} Z`, S(p, 'cushion'), stroke(p), 0.006, T(p, 'tissu'));
+  s += rect(-w / 2 + 0.03, top, w - 0.06, 0.16, S(p, 'white'), stroke(p), 0.03, 0.005);
+  if (!p.flat) {
+    for (const k of [0.3, 0.55, 0.78]) s += path(`M ${f(-w / 2 + 0.1)} ${f(top + 0.2 + (d - head - 0.5) * k)} Q ${f(-w * 0.1)} ${f(top + 0.24 + (d - head - 0.5) * k)} ${f(w / 2 - 0.15)} ${f(top + 0.18 + (d - head - 0.5) * k)}`, 'none', 'rgba(0,0,0,0.08)', 0.012);
+  }
+  // Plaid au pied du lit.
+  s += rect(-w / 2 + 0.02, d / 2 - 0.42, w - 0.04, 0.3, S(p, 'accent'), stroke(p), 0.03, 0.005, T(p, 'tissu'));
+  if (!p.flat) s += line(-w / 2 + 0.02, d / 2 - 0.15, w / 2 - 0.02, d / 2 - 0.15, 'rgba(255,255,255,0.45)', 0.012);
   return s;
 }
 
 function sofa(w: number, d: number, p: Palette): string {
-  const arm = Math.min(0.2, w * 0.1), back = Math.min(0.22, d * 0.25);
-  let s = rect(-w / 2, -d / 2, w, d, p.fabricDark, p.line, 0.08, 0.008);
-  const seats = Math.max(1, Math.round((w - 2 * arm) / 0.65));
+  const arm = Math.min(0.2, w * 0.1), back = Math.min(0.24, d * 0.27);
+  let s = rect(-w / 2, -d / 2, w, d, S(p, 'fabricDark'), stroke(p), 0.1, 0.008, T(p, 'tissu'));
+  // Dossier en coussins.
+  const seats = Math.max(1, Math.round((w - 2 * arm) / 0.68));
   const sw = (w - 2 * arm) / seats;
-  for (let i = 0; i < seats; i++) s += rect(-w / 2 + arm + i * sw + 0.01, -d / 2 + back, sw - 0.02, d - back - 0.03, p.fabric, p.line, 0.06, 0.006);
-  s += rect(-w / 2 + 0.25, -d / 2 + back + 0.05, 0.35, 0.2, p.cushion, 'none', 0.05);
+  for (let i = 0; i < seats; i++) s += rect(-w / 2 + arm + i * sw + 0.01, -d / 2 + 0.02, sw - 0.02, back - 0.02, S(p, 'fabricDark'), stroke(p), 0.07, 0.005, T(p, 'tissu'));
+  for (let i = 0; i < seats; i++) s += rect(-w / 2 + arm + i * sw + 0.012, -d / 2 + back, sw - 0.024, d - back - 0.04, S(p, 'fabric'), stroke(p), 0.07, 0.006, T(p, 'tissu'));
+  // Accoudoirs.
+  s += rect(-w / 2, -d / 2 + 0.04, arm, d - 0.06, S(p, 'fabricDark'), stroke(p), 0.08, 0.006, T(p, 'tissu'));
+  s += rect(w / 2 - arm, -d / 2 + 0.04, arm, d - 0.06, S(p, 'fabricDark'), stroke(p), 0.08, 0.006, T(p, 'tissu'));
+  // Coussins décoratifs posés en biais.
+  s += g(-w / 2 + arm + 0.22, -d / 2 + back + 0.14, -14, pillow(-0.17, -0.12, 0.34, 0.24, S(p, 'accent'), p));
+  s += g(w / 2 - arm - 0.22, -d / 2 + back + 0.14, 12, pillow(-0.17, -0.12, 0.34, 0.24, S(p, 'accent2'), p));
   return s;
 }
 
+/** Plante en pot vue de dessus : feuilles pointues superposées, en éventail. */
 function plant(w: number, d: number, p: Palette): string {
   const r = Math.min(w, d) / 2;
-  let s = circle(0, 0, r * 0.45, p.woodDark, p.line, 0.006);
-  for (let i = 0; i < 9; i++) {
-    const a = (i / 9) * Math.PI * 2;
-    s += `<ellipse cx="${f(Math.cos(a) * r * 0.5)}" cy="${f(Math.sin(a) * r * 0.5)}" rx="${f(r * 0.5)}" ry="${f(r * 0.17)}" transform="rotate(${f((a * 180) / Math.PI)} ${f(Math.cos(a) * r * 0.5)} ${f(Math.sin(a) * r * 0.5)})" fill="${i % 2 ? p.plant : p.plantDark}"/>`;
+  let s = circle(0, 0, r * 0.42, L(p, 'stone'), stroke(p), 0.006) + circle(0, 0, r * 0.34, '#3b2a1e');
+  const leaf = (a: number, len: number, wid: number, fill: string) => {
+    const rad = (a * Math.PI) / 180;
+    const tip: [number, number] = [Math.cos(rad) * len, Math.sin(rad) * len];
+    const nx = -Math.sin(rad) * wid, ny = Math.cos(rad) * wid;
+    const mid: [number, number] = [tip[0] * 0.5, tip[1] * 0.5];
+    return path(`M 0 0 Q ${f(mid[0] + nx)} ${f(mid[1] + ny)} ${f(tip[0])} ${f(tip[1])} Q ${f(mid[0] - nx)} ${f(mid[1] - ny)} 0 0 Z`, fill, 'rgba(0,0,0,0.18)', 0.004) +
+      (p.flat ? '' : line(0, 0, tip[0] * 0.92, tip[1] * 0.92, 'rgba(255,255,255,0.25)', 0.005));
+  };
+  for (let i = 0; i < 11; i++) s += leaf(i * 33 + 8, r * (0.85 + (i % 3) * 0.06), r * 0.16, L(p, 'plantDark'));
+  for (let i = 0; i < 9; i++) s += leaf(i * 40 + 25, r * (0.7 + (i % 2) * 0.08), r * 0.14, L(p, 'plant'));
+  return s;
+}
+
+function tree(w: number, d: number, p: Palette): string {
+  const r = Math.min(w, d) / 2;
+  let s = circle(0.05 * r, 0.08 * r, r * 0.98, 'rgba(0,0,0,0.18)');
+  const blobs = 9;
+  for (let i = 0; i < blobs; i++) {
+    const a = (i / blobs) * Math.PI * 2;
+    s += circle(Math.cos(a) * r * 0.45, Math.sin(a) * r * 0.45, r * 0.5, S(p, i % 2 ? 'plant' : 'plantDark'), 'none', 0, T(p, 'tissu'));
   }
-  return s + circle(0, 0, r * 0.18, p.plantDark);
+  return s + circle(0, 0, r * 0.55, S(p, 'plant'), 'none', 0, T(p, 'tissu'));
+}
+
+function car(w: number, d: number, p: Palette): string {
+  const x0 = -w / 2, y0 = -d / 2;
+  // Carrosserie : avant arrondi (en haut), arrière plus droit.
+  const shell = `M ${f(x0 + w * 0.18)} ${f(y0)} Q ${f(0)} ${f(y0 - 0.04)} ${f(-x0 - w * 0.18)} ${f(y0)} Q ${f(-x0)} ${f(y0 + 0.08)} ${f(-x0)} ${f(y0 + d * 0.22)} L ${f(-x0)} ${f(-y0 - d * 0.1)} Q ${f(-x0)} ${f(-y0)} ${f(-x0 - w * 0.2)} ${f(-y0)} L ${f(x0 + w * 0.2)} ${f(-y0)} Q ${f(x0)} ${f(-y0)} ${f(x0)} ${f(-y0 - d * 0.1)} L ${f(x0)} ${f(y0 + d * 0.22)} Q ${f(x0)} ${f(y0 + 0.08)} ${f(x0 + w * 0.18)} ${f(y0)} Z`;
+  let s = '';
+  // Roues qui dépassent légèrement.
+  for (const sx of [-1, 1]) for (const yy of [y0 + d * 0.2, -y0 - d * 0.22]) s += rect(sx * w / 2 - 0.07, yy - 0.3, 0.14, 0.6, '#151515', 'none', 0.05);
+  s += path(shell, S(p, 'car'), 'rgba(0,0,0,0.45)', 0.012);
+  // Capot : nervures.
+  if (!p.flat) {
+    s += path(`M ${f(-w * 0.22)} ${f(y0 + 0.12)} Q ${f(-w * 0.18)} ${f(y0 + d * 0.15)} ${f(-w * 0.2)} ${f(y0 + d * 0.27)}`, 'none', 'rgba(0,0,0,0.15)', 0.01);
+    s += path(`M ${f(w * 0.22)} ${f(y0 + 0.12)} Q ${f(w * 0.18)} ${f(y0 + d * 0.15)} ${f(w * 0.2)} ${f(y0 + d * 0.27)}`, 'none', 'rgba(0,0,0,0.15)', 0.01);
+  }
+  // Pare-brise, toit, lunette arrière.
+  const glass = p.flat ? p.glass : 'url(#car-glass)';
+  s += path(`M ${f(-w * 0.4)} ${f(y0 + d * 0.31)} Q ${f(0)} ${f(y0 + d * 0.27)} ${f(w * 0.4)} ${f(y0 + d * 0.31)} L ${f(w * 0.36)} ${f(y0 + d * 0.43)} L ${f(-w * 0.36)} ${f(y0 + d * 0.43)} Z`, glass, 'rgba(0,0,0,0.5)', 0.008);
+  s += rect(-w * 0.36, y0 + d * 0.43, w * 0.72, d * 0.24, S(p, 'car'), 'rgba(0,0,0,0.3)', 0.08, 0.008);
+  s += path(`M ${f(-w * 0.36)} ${f(y0 + d * 0.67)} L ${f(w * 0.36)} ${f(y0 + d * 0.67)} L ${f(w * 0.38)} ${f(y0 + d * 0.77)} Q ${f(0)} ${f(y0 + d * 0.8)} ${f(-w * 0.38)} ${f(y0 + d * 0.77)} Z`, glass, 'rgba(0,0,0,0.5)', 0.008);
+  // Vitres latérales.
+  for (const sx of [-1, 1]) {
+    s += path(`M ${f(sx * w * 0.4)} ${f(y0 + d * 0.33)} L ${f(sx * w * 0.44)} ${f(y0 + d * 0.45)} L ${f(sx * w * 0.44)} ${f(y0 + d * 0.66)} L ${f(sx * w * 0.38)} ${f(y0 + d * 0.75)} L ${f(sx * w * 0.37)} ${f(y0 + d * 0.43)} Z`, glass, 'rgba(0,0,0,0.4)', 0.006);
+    // Rétroviseurs.
+    s += ellipse(sx * (w / 2 + 0.05), y0 + d * 0.33, 0.07, 0.045, S(p, 'car'), 'rgba(0,0,0,0.4)', 0.006);
+  }
+  // Phares et feux.
+  for (const sx of [-1, 1]) {
+    s += path(`M ${f(sx * w * 0.42)} ${f(y0 + 0.07)} Q ${f(sx * w * 0.3)} ${f(y0 + 0.01)} ${f(sx * w * 0.2)} ${f(y0 + 0.02)} L ${f(sx * w * 0.22)} ${f(y0 + 0.07)} Z`, '#f4f6f8', 'rgba(0,0,0,0.3)', 0.005);
+    s += rect(sx > 0 ? w * 0.22 : -w * 0.42, -y0 - 0.06, w * 0.2, 0.045, '#b3261e', 'none', 0.015);
+  }
+  if (!p.flat) s += rect(-w * 0.04, y0 + d * 0.46, w * 0.08, d * 0.18, 'rgba(255,255,255,0.18)', 'none', 0.03);
+  return s;
+}
+
+function shower(w: number, d: number, p: Palette): string {
+  let s = rect(-w / 2, -d / 2, w, d, S(p, 'white'), stroke(p), 0.03, 0.008);
+  s += rect(-w / 2 + 0.05, -d / 2 + 0.05, w - 0.1, d - 0.1, S(p, 'glass'), 'rgba(0,0,0,0.15)', 0.02, 0.005);
+  for (let i = 1; i < 6; i++) s += line(-w / 2 + 0.05 + ((w - 0.1) * i) / 6, -d / 2 + 0.05, -w / 2 + 0.05 + ((w - 0.1) * i) / 6, d / 2 - 0.05, 'rgba(0,0,0,0.05)', 0.004);
+  s += circle(0, 0, 0.045, L(p, 'metal'), 'rgba(0,0,0,0.4)', 0.005);
+  s += circle(-w / 2 + 0.12, -d / 2 + 0.12, 0.06, L(p, 'metal'), 'rgba(0,0,0,0.3)', 0.005);
+  return s + line(-w / 2, d / 2, w / 2, d / 2, 'rgba(120,170,190,0.8)', 0.025);
 }
 
 export const FURNITURE: Record<string, FurnitureDef> = {
   lit_double: { label: 'Lit double', category: 'chambre', w: 1.6, d: 2.0, draw: (w, d, p) => bed(w, d, p, 2) },
   lit_simple: { label: 'Lit simple', category: 'chambre', w: 0.9, d: 1.9, draw: (w, d, p) => bed(w, d, p, 1) },
-  chevet: { label: 'Table de chevet', category: 'chambre', w: 0.45, d: 0.4, draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, p.wood, p.line, 0.03) + circle(0, 0.02, Math.min(w, d) * 0.22, p.white, p.line, 0.005) },
+  chevet: {
+    label: 'Table de chevet', category: 'chambre', w: 0.45, d: 0.4,
+    draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, L(p, 'wood'), stroke(p), 0.03, 0.006, T(p, 'bois')) +
+      circle(0, 0, Math.min(w, d) * 0.24, S(p, 'linen'), stroke(p), 0.005) + circle(0, 0, Math.min(w, d) * 0.08, '#fff6d8'),
+  },
   armoire: {
     label: 'Armoire', category: 'chambre', w: 1.2, d: 0.6,
-    draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, p.wood, p.line, 0.02) + line(0, -d / 2, 0, d / 2, p.line, 0.008) + line(-w / 2 + 0.05, -d / 2 + d * 0.45, w / 2 - 0.05, -d / 2 + d * 0.45, p.line, 0.006, 'stroke-dasharray="0.04 0.03"'),
+    draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, L(p, 'wood'), stroke(p), 0.02, 0.008, T(p, 'bois')) +
+      line(0, -d / 2 + 0.02, 0, d / 2 - 0.02, 'rgba(0,0,0,0.35)', 0.008) +
+      rect(-0.06, d / 2 - 0.08, 0.035, 0.05, L(p, 'metal'), 'none', 0.01) + rect(0.025, d / 2 - 0.08, 0.035, 0.05, L(p, 'metal'), 'none', 0.01),
   },
   canape: { label: 'Canapé', category: 'sejour', w: 2.1, d: 0.9, draw: sofa },
   canape_angle: {
     label: 'Canapé d’angle', category: 'sejour', w: 2.5, d: 1.7,
     draw: (w, d, p) => {
-      // Partie principale contre le dos, retour en équerre à droite.
       const depth = 0.9;
-      const ret = `<g transform="translate(${f(w / 2 - depth / 2)} ${f(depth / 2 + (d - depth) / 2 - 0.01)})">${rect(-depth / 2, -(d - depth) / 2, depth, d - depth, p.fabricDark, p.line, 0.06, 0.008)}${rect(-depth / 2 + 0.03, -(d - depth) / 2 + 0.02, depth - 0.25, d - depth - 0.06, p.fabric, p.line, 0.05, 0.006)}</g>`;
-      return `<g transform="translate(0 ${f(-d / 2 + depth / 2)})">${sofa(w, depth, p)}</g>` + ret;
+      // Retour en équerre, accolé sous l'extrémité droite de la partie principale.
+      const ret = g(w / 2 - depth / 2, -d / 2 + depth + (d - depth) / 2 - 0.025, 0,
+        rect(-depth / 2, -(d - depth) / 2 - 0.05, depth, d - depth + 0.05, S(p, 'fabricDark'), stroke(p), 0.08, 0.006, T(p, 'tissu')) +
+        rect(-depth / 2 + 0.03, -(d - depth) / 2, depth - 0.25, d - depth - 0.05, S(p, 'fabric'), stroke(p), 0.07, 0.006, T(p, 'tissu')));
+      return ret + g(0, -d / 2 + depth / 2, 0, sofa(w, depth, p));
     },
   },
-  fauteuil: { label: 'Fauteuil', category: 'sejour', w: 0.85, d: 0.85, draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, p.fabricDark, p.line, 0.12, 0.008) + rect(-w / 2 + 0.14, -d / 2 + 0.2, w - 0.28, d - 0.26, p.fabric, p.line, 0.08, 0.006) },
-  table_basse: { label: 'Table basse', category: 'sejour', w: 1.1, d: 0.6, draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, p.wood, p.line, 0.04) + rect(-0.25, -0.1, 0.24, 0.18, p.white, p.line, 0.02, 0.005) + `<g transform="translate(0.2 0)">${plant(0.22, 0.22, p)}</g>` },
-  meuble_tv: { label: 'Meuble TV', category: 'sejour', w: 1.6, d: 0.45, draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, p.woodDark, p.line, 0.02) + rect(-w * 0.35, -d / 2 + 0.05, w * 0.7, 0.06, '#1b1b1b', 'none', 0.01) },
-  tapis: { label: 'Tapis', category: 'sejour', w: 2.0, d: 1.4, under: true, draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, p.rug, 'none', 0.03) + rect(-w / 2 + 0.06, -d / 2 + 0.06, w - 0.12, d - 0.12, 'none', p.white, 0.02, 0.012) },
+  fauteuil: {
+    label: 'Fauteuil', category: 'sejour', w: 0.85, d: 0.85,
+    draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, S(p, 'fabricDark'), stroke(p), 0.16, 0.008, T(p, 'tissu')) +
+      rect(-w / 2 + 0.14, -d / 2 + 0.2, w - 0.28, d - 0.26, S(p, 'fabric'), stroke(p), 0.1, 0.006, T(p, 'tissu')) +
+      g(0, -d / 2 + 0.28, -8, pillow(-0.15, -0.09, 0.3, 0.18, S(p, 'accent'), p)),
+  },
+  table_basse: {
+    label: 'Table basse', category: 'sejour', w: 1.1, d: 0.6,
+    draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, L(p, 'wood'), stroke(p), 0.04, 0.006, T(p, 'bois')) +
+      rect(-w * 0.32, -d * 0.18, w * 0.22, d * 0.32, S(p, 'white'), stroke(p), 0.01, 0.004) +
+      line(-w * 0.3, -d * 0.1, -w * 0.12, -d * 0.1, 'rgba(0,0,0,0.25)', 0.004) +
+      g(w * 0.22, 0, 0, plant(0.24, 0.24, p)),
+  },
+  meuble_tv: {
+    label: 'Meuble TV', category: 'sejour', w: 1.6, d: 0.45,
+    draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, L(p, 'woodDark'), stroke(p), 0.02, 0.006, T(p, 'bois')) +
+      rect(-w * 0.36, -d / 2 + 0.03, w * 0.72, 0.07, p.flat ? '#222' : 'url(#tv-screen)', 'none', 0.01) +
+      rect(-0.1, -d / 2 + 0.1, 0.2, 0.08, '#1d1d1d', 'none', 0.01) +
+      circle(w * 0.38, d * 0.1, 0.06, S(p, 'stone'), stroke(p), 0.004),
+  },
+  tapis: {
+    label: 'Tapis', category: 'sejour', w: 2.0, d: 1.4, under: true,
+    draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, S(p, 'rug'), 'none', 0.02, 0, T(p, 'tissu')) +
+      rect(-w / 2 + 0.08, -d / 2 + 0.08, w - 0.16, d - 0.16, 'none', shade(p.rug, -0.2), 0.01, 0.018) +
+      rect(-w / 2 + 0.14, -d / 2 + 0.14, w - 0.28, d - 0.28, 'none', shade(p.rug, -0.12), 0.01, 0.006),
+  },
   table_4: {
     label: 'Table 4 places', category: 'sejour', w: 1.3, d: 1.7,
     draw: (w, d, p) => {
       const tw = w - 0.1, td = d - 0.9;
-      return chair(-tw / 4, -td / 2 - 0.18, 0.42, 0, p) + chair(tw / 4, -td / 2 - 0.18, 0.42, 0, p) + chair(-tw / 4, td / 2 + 0.18, 0.42, 180, p) + chair(tw / 4, td / 2 + 0.18, 0.42, 180, p) +
-        rect(-tw / 2, -td / 2, tw, td, p.wood, p.line, 0.03) + circle(0, 0, 0.09, p.plant, p.line, 0.005);
+      let s = chair(-tw / 4, -td / 2 - 0.16, 0.44, 0, p) + chair(tw / 4, -td / 2 - 0.16, 0.44, 0, p) + chair(-tw / 4, td / 2 + 0.16, 0.44, 180, p) + chair(tw / 4, td / 2 + 0.16, 0.44, 180, p);
+      s += rect(-tw / 2, -td / 2, tw, td, L(p, 'wood'), stroke(p), 0.03, 0.006, T(p, 'bois'));
+      for (const [x, y] of [[-tw / 4, -td / 2 + 0.17], [tw / 4, -td / 2 + 0.17], [-tw / 4, td / 2 - 0.17], [tw / 4, td / 2 - 0.17]]) s += circle(x, y, 0.11, S(p, 'white'), stroke(p), 0.004) + circle(x, y, 0.07, 'none', 'rgba(0,0,0,0.1)', 0.004);
+      return s + g(0, 0, 0, plant(0.22, 0.22, p));
     },
   },
   table_6: {
@@ -118,70 +299,106 @@ export const FURNITURE: Record<string, FurnitureDef> = {
     draw: (w, d, p) => {
       const tw = w - 0.1, td = d - 0.85;
       let s = '';
-      for (const x of [-tw / 3, 0, tw / 3]) s += chair(x, -td / 2 - 0.18, 0.42, 0, p) + chair(x, td / 2 + 0.18, 0.42, 180, p);
-      return s + rect(-tw / 2, -td / 2, tw, td, p.wood, p.line, 0.03) + circle(0, 0, 0.1, p.plant, p.line, 0.005);
+      for (const x of [-tw / 3, 0, tw / 3]) s += chair(x, -td / 2 - 0.16, 0.44, 0, p) + chair(x, td / 2 + 0.16, 0.44, 180, p);
+      s += rect(-tw / 2, -td / 2, tw, td, L(p, 'wood'), stroke(p), 0.03, 0.006, T(p, 'bois'));
+      for (const x of [-tw / 3, 0, tw / 3]) for (const y of [-td / 2 + 0.17, td / 2 - 0.17]) s += circle(x, y, 0.11, S(p, 'white'), stroke(p), 0.004) + circle(x, y, 0.07, 'none', 'rgba(0,0,0,0.1)', 0.004);
+      return s + g(0, 0, 0, plant(0.24, 0.24, p));
     },
   },
   cuisine_lineaire: {
     label: 'Plan de travail (évier, cuisson)', category: 'cuisine', w: 2.4, d: 0.6,
     draw: (w, d, p) => {
-      let s = rect(-w / 2, -d / 2, w, d, p.white, p.line, 0.01, 0.01);
-      s += rect(-w / 2, -d / 2, w, 0.04, p.woodDark);
-      // Évier double bac.
+      let s = rect(-w / 2, -d / 2, w, d, L(p, 'stone'), stroke(p), 0.01, 0.008, T(p, 'pierre'));
+      s += rect(-w / 2, -d / 2, w, 0.035, L(p, 'woodDark'));
+      // Évier inox double bac et robinet.
       const sx = -w / 2 + Math.min(0.55, w * 0.25);
-      s += rect(sx - 0.38, -d / 2 + 0.1, 0.36, 0.38, p.metal, p.line, 0.04, 0.006) + rect(sx + 0.02, -d / 2 + 0.1, 0.36, 0.38, p.metal, p.line, 0.04, 0.006);
-      s += circle(sx, -d / 2 + 0.07, 0.025, p.line);
-      // Plaque 4 feux.
+      s += rect(sx - 0.4, -d / 2 + 0.09, 0.8, 0.42, L(p, 'metal'), 'rgba(0,0,0,0.35)', 0.04, 0.006);
+      s += rect(sx - 0.37, -d / 2 + 0.12, 0.35, 0.36, S(p, 'metal'), 'rgba(0,0,0,0.3)', 0.04, 0.005) + rect(sx + 0.02, -d / 2 + 0.12, 0.35, 0.36, S(p, 'metal'), 'rgba(0,0,0,0.3)', 0.04, 0.005);
+      s += circle(sx - 0.19, -d / 2 + 0.3, 0.02, '#555') + circle(sx + 0.2, -d / 2 + 0.3, 0.02, '#555');
+      s += circle(sx, -d / 2 + 0.065, 0.025, L(p, 'metal'), 'rgba(0,0,0,0.4)', 0.004) + line(sx, -d / 2 + 0.065, sx, -d / 2 + 0.2, '#9aa0a6', 0.018, 'stroke-linecap="round"');
+      // Plaque vitrocéramique 4 foyers.
       const hx = w / 2 - Math.min(0.55, w * 0.25);
-      s += rect(hx - 0.3, -d / 2 + 0.08, 0.6, 0.46, '#26282b', p.line, 0.02, 0.006);
-      for (const [x, y, r] of [[-0.14, -0.11, 0.08], [0.14, -0.11, 0.06], [-0.14, 0.11, 0.06], [0.14, 0.11, 0.08]]) s += circle(hx + x, y + 0.01, r, 'none', '#8a8f96', 0.01);
+      s += rect(hx - 0.3, -d / 2 + 0.07, 0.6, 0.48, p.flat ? '#2b2b2b' : 'url(#hob)', 'rgba(0,0,0,0.6)', 0.02, 0.006);
+      for (const [x, y, r] of [[-0.14, -0.11, 0.09], [0.14, -0.11, 0.07], [-0.14, 0.11, 0.07], [0.14, 0.11, 0.09]]) s += circle(hx + x, y + 0.01, r, 'none', 'rgba(255,255,255,0.35)', 0.006) + circle(hx + x, y + 0.01, r * 0.6, 'none', 'rgba(255,255,255,0.15)', 0.004);
+      // Planche à découper.
+      if (w > 1.8) s += rect(-0.15, -d / 2 + 0.15, 0.3, 0.22, L(p, 'wood'), stroke(p), 0.02, 0.004, T(p, 'bois'));
       return s;
     },
   },
-  ilot: { label: 'Îlot central', category: 'cuisine', w: 1.6, d: 0.9, draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, p.white, p.line, 0.02) + rect(-w / 2 + 0.05, -d / 2 + 0.05, w - 0.1, d - 0.1, 'none', p.woodDark, 0.02, 0.01) },
-  refrigerateur: { label: 'Réfrigérateur', category: 'cuisine', w: 0.7, d: 0.7, draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, p.metal, p.line, 0.02) + line(-w / 2 + 0.05, d / 2 - 0.06, w / 2 - 0.05, d / 2 - 0.06, p.line, 0.01) },
-  lave_linge: { label: 'Lave-linge', category: 'cuisine', w: 0.6, d: 0.6, draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, p.white, p.line, 0.03) + circle(0, 0.03, Math.min(w, d) * 0.3, p.glass, p.line, 0.008) },
+  ilot: {
+    label: 'Îlot central', category: 'cuisine', w: 1.6, d: 0.9,
+    draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, L(p, 'stone'), stroke(p), 0.02, 0.008, T(p, 'pierre')) +
+      rect(-w / 2 + 0.05, -d / 2 + 0.05, w - 0.1, d - 0.1, 'none', 'rgba(0,0,0,0.08)', 0.01, 0.006) +
+      circle(-w * 0.25, 0, 0.12, S(p, 'white'), stroke(p), 0.004) + g(w * 0.25, 0, 0, plant(0.22, 0.22, p)),
+  },
+  refrigerateur: {
+    label: 'Réfrigérateur', category: 'cuisine', w: 0.7, d: 0.7,
+    draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, L(p, 'metal'), 'rgba(0,0,0,0.4)', 0.03, 0.008) +
+      rect(-w / 2 + 0.04, -d / 2 + 0.04, w - 0.08, d - 0.12, S(p, 'metal'), 'none', 0.02) +
+      line(-w / 2 + 0.06, d / 2 - 0.05, w / 2 - 0.06, d / 2 - 0.05, '#7c8288', 0.018, 'stroke-linecap="round"'),
+  },
+  lave_linge: {
+    label: 'Lave-linge', category: 'cuisine', w: 0.6, d: 0.6,
+    draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, S(p, 'white'), stroke(p), 0.03, 0.008) +
+      circle(0, 0.03, Math.min(w, d) * 0.3, L(p, 'metal'), 'rgba(0,0,0,0.35)', 0.008) + circle(0, 0.03, Math.min(w, d) * 0.22, S(p, 'glass'), 'rgba(0,0,0,0.25)', 0.005),
+  },
   wc: {
     label: 'WC', category: 'sanitaire', w: 0.4, d: 0.65,
-    draw: (w, d, p) => rect(-w / 2, -d / 2, w, 0.18, p.white, p.line, 0.03) + ellipse(0, -d / 2 + 0.18 + (d - 0.18) / 2, w * 0.45, (d - 0.18) / 2, p.white, p.line) + ellipse(0, -d / 2 + 0.2 + (d - 0.18) / 2, w * 0.28, (d - 0.18) * 0.32, p.glass, p.line, 0.006),
+    draw: (w, d, p) => rect(-w / 2, -d / 2, w, 0.19, S(p, 'white'), stroke(p), 0.04, 0.006) +
+      rect(-0.04, -d / 2 + 0.06, 0.08, 0.05, L(p, 'metal'), 'none', 0.015) +
+      ellipse(0, -d / 2 + 0.19 + (d - 0.19) / 2, w * 0.46, (d - 0.19) / 2, S(p, 'white'), stroke(p), 0.006) +
+      ellipse(0, -d / 2 + 0.21 + (d - 0.19) / 2, w * 0.3, (d - 0.19) * 0.32, S(p, 'glass'), 'rgba(0,0,0,0.2)', 0.005),
   },
-  lavabo: { label: 'Lavabo', category: 'sanitaire', w: 0.6, d: 0.45, draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, p.white, p.line, 0.04) + ellipse(0, 0.02, w * 0.32, d * 0.3, p.glass, p.line, 0.006) + circle(0, -d / 2 + 0.07, 0.02, p.metal, p.line, 0.004) },
-  douche: {
-    label: 'Douche', category: 'sanitaire', w: 0.9, d: 0.9,
-    draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, p.white, p.line, 0.02) + line(-w / 2 + 0.05, -d / 2 + 0.05, w / 2 - 0.05, d / 2 - 0.05, p.line, 0.004, 'opacity="0.4"') + line(w / 2 - 0.05, -d / 2 + 0.05, -w / 2 + 0.05, d / 2 - 0.05, p.line, 0.004, 'opacity="0.4"') + circle(0, 0, 0.04, p.metal, p.line, 0.005) + line(-w / 2, d / 2, w / 2, d / 2, p.glass, 0.03),
+  lavabo: {
+    label: 'Lavabo', category: 'sanitaire', w: 0.6, d: 0.45,
+    draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, L(p, 'stone'), stroke(p), 0.04, 0.006, T(p, 'pierre')) +
+      ellipse(0, 0.03, w * 0.33, d * 0.31, S(p, 'white'), 'rgba(0,0,0,0.25)', 0.006) + circle(0, 0.05, 0.015, '#777') +
+      line(0, -d / 2 + 0.05, 0, -d / 2 + 0.14, '#9aa0a6', 0.02, 'stroke-linecap="round"'),
   },
-  baignoire: { label: 'Baignoire', category: 'sanitaire', w: 1.7, d: 0.75, draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, p.white, p.line, 0.06) + rect(-w / 2 + 0.07, -d / 2 + 0.07, w - 0.14, d - 0.14, p.glass, p.line, 0.25, 0.006) + circle(-w / 2 + 0.22, 0, 0.03, p.metal) },
-  bureau: { label: 'Bureau et chaise', category: 'bureau', w: 1.4, d: 1.2, draw: (w, d, p) => chair(0, d / 2 - 0.3, 0.5, 180, p) + rect(-w / 2, -d / 2, w, 0.7, p.wood, p.line, 0.02) + rect(-0.25, -d / 2 + 0.08, 0.5, 0.06, '#1b1b1b') },
+  douche: { label: 'Douche', category: 'sanitaire', w: 0.9, d: 0.9, draw: shower },
+  baignoire: {
+    label: 'Baignoire', category: 'sanitaire', w: 1.7, d: 0.75,
+    draw: (w, d, p) => rect(-w / 2, -d / 2, w, d, S(p, 'white'), stroke(p), 0.07, 0.008) +
+      rect(-w / 2 + 0.08, -d / 2 + 0.08, w - 0.16, d - 0.16, S(p, 'glass'), 'rgba(0,0,0,0.2)', 0.28, 0.006) +
+      circle(-w / 2 + 0.24, 0, 0.025, '#777') + line(-w / 2 + 0.04, 0, -w / 2 + 0.12, 0, '#9aa0a6', 0.022, 'stroke-linecap="round"'),
+  },
+  bureau: {
+    label: 'Bureau et chaise', category: 'bureau', w: 1.4, d: 1.2,
+    draw: (w, d, p) => g(0, d / 2 - 0.3, 180, rect(-0.27, -0.27, 0.54, 0.54, S(p, 'fabricDark'), stroke(p), 0.2, 0.006) + rect(-0.22, -0.27, 0.44, 0.12, S(p, 'fabric'), 'none', 0.06)) +
+      rect(-w / 2, -d / 2, w, 0.7, L(p, 'wood'), stroke(p), 0.02, 0.006, T(p, 'bois')) +
+      rect(-0.28, -d / 2 + 0.06, 0.56, 0.05, '#1b1b1b', 'none', 0.01) + rect(-0.22, -d / 2 + 0.3, 0.44, 0.14, '#cfd3d6', stroke(p), 0.01, 0.004) +
+      circle(w / 2 - 0.2, -d / 2 + 0.18, 0.06, S(p, 'accent'), stroke(p), 0.004),
+  },
   chaise: { label: 'Chaise', category: 'bureau', w: 0.45, d: 0.45, draw: (w, _d, p) => chair(0, 0, w, 0, p) },
-  voiture: {
-    label: 'Voiture', category: 'exterieur', w: 1.8, d: 4.4,
-    draw: (w, d, p) => {
-      let s = rect(-w / 2, -d / 2, w, d, p.car, p.line, 0.35, 0.012);
-      s += rect(-w / 2 + 0.15, -d / 2 + d * 0.27, w - 0.3, d * 0.16, p.glass, p.line, 0.12, 0.008);
-      s += rect(-w / 2 + 0.18, -d / 2 + d * 0.45, w - 0.36, d * 0.24, p.car, p.line, 0.1, 0.006);
-      s += rect(-w / 2 + 0.2, -d / 2 + d * 0.7, w - 0.4, d * 0.1, p.glass, p.line, 0.1, 0.008);
-      // Roues (dépassant légèrement de la carrosserie).
-      for (const x of [-1, 1]) for (const y of [-0.3, 0.3]) s = rect((x * w) / 2 - 0.06, y * d - 0.32, 0.12, 0.64, '#1b1b1b', 'none', 0.04) + s;
-      return s;
-    },
-  },
+  voiture: { label: 'Voiture', category: 'exterieur', w: 1.8, d: 4.4, draw: car },
   plante: { label: 'Plante', category: 'exterieur', w: 0.6, d: 0.6, draw: plant },
-  arbre: { label: 'Arbre', category: 'exterieur', w: 2.4, d: 2.4, draw: plant },
+  arbre: { label: 'Arbre', category: 'exterieur', w: 2.4, d: 2.4, draw: tree },
   salon_jardin: {
     label: 'Salon de jardin', category: 'exterieur', w: 1.8, d: 1.8,
-    draw: (_w, _d, p) => circle(0, 0, 0.45, p.wood, p.line, 0.01) + chair(0, -0.7, 0.45, 0, p) + chair(0, 0.7, 0.45, 180, p) + chair(-0.7, 0, 0.45, 270, p) + chair(0.7, 0, 0.45, 90, p),
+    draw: (_w, _d, p) => chair(0, -0.68, 0.48, 0, p) + chair(0, 0.68, 0.48, 180, p) + chair(-0.68, 0, 0.48, 270, p) + chair(0.68, 0, 0.48, 90, p) +
+      circle(0, 0, 0.45, L(p, 'wood'), stroke(p), 0.008, T(p, 'bois')) + g(0, 0, 0, plant(0.24, 0.24, p)),
   },
   escalier: {
     label: 'Escalier droit', category: 'structure', w: 1.0, d: 3.2,
     draw: (w, d, p) => {
       const steps = Math.max(3, Math.round(d / 0.27));
-      let s = rect(-w / 2, -d / 2, w, d, p.wood, p.line, 0, 0.012);
-      for (let i = 1; i < steps; i++) s += line(-w / 2, -d / 2 + (i * d) / steps, w / 2, -d / 2 + (i * d) / steps, p.line, 0.008);
-      s += line(0, d / 2 - 0.15, 0, -d / 2 + 0.25, p.line, 0.012) + `<path d="M ${f(-0.08)} ${f(-d / 2 + 0.35)} L 0 ${f(-d / 2 + 0.2)} L ${f(0.08)} ${f(-d / 2 + 0.35)}" fill="none" stroke="${p.line}" stroke-width="0.012"/>`;
+      let s = rect(-w / 2, -d / 2, w, d, L(p, 'wood'), stroke(p), 0, 0.012, T(p, 'bois'));
+      for (let i = 1; i < steps; i++) {
+        const y = -d / 2 + (i * d) / steps;
+        s += line(-w / 2, y, w / 2, y, 'rgba(0,0,0,0.45)', 0.01) + (p.flat ? '' : line(-w / 2, y + 0.012, w / 2, y + 0.012, 'rgba(255,255,255,0.25)', 0.008));
+      }
+      s += line(0, d / 2 - 0.15, 0, -d / 2 + 0.25, p.line, 0.012) + path(`M ${f(-0.08)} ${f(-d / 2 + 0.35)} L 0 ${f(-d / 2 + 0.2)} L ${f(0.08)} ${f(-d / 2 + 0.35)}`, 'none', p.line, 0.012);
       return s;
     },
   },
 };
+
+/** Dégradés spéciaux (verre de voiture, écran, plaque de cuisson). */
+export function specialDefs(): string {
+  return `<linearGradient id="car-glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8fa3b3"/><stop offset="0.35" stop-color="#4a5d6c"/><stop offset="0.5" stop-color="#7d93a4"/><stop offset="0.65" stop-color="#3d4f5d"/><stop offset="1" stop-color="#2a3742"/></linearGradient>` +
+    `<linearGradient id="tv-screen" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#111"/><stop offset="0.5" stop-color="#333"/><stop offset="1" stop-color="#0d0d0d"/></linearGradient>` +
+    `<linearGradient id="hob" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a3d40"/><stop offset="0.5" stop-color="#1c1e20"/><stop offset="1" stop-color="#2a2c2e"/></linearGradient>`;
+}
 
 export const FURNITURE_CATEGORIES: Record<FurnitureCategory, string> = {
   chambre: 'Chambre', sejour: 'Séjour et repas', cuisine: 'Cuisine et buanderie', sanitaire: 'Sanitaires', bureau: 'Bureau', exterieur: 'Extérieur et garage', structure: 'Structure',

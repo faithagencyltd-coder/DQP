@@ -95,7 +95,7 @@ describe('plans : aménagement proposé', () => {
   it('chaque type de meuble a une taille et un dessin', () => {
     for (const [k, d] of Object.entries(FURNITURE)) {
       expect(d.w, k).toBeGreaterThan(0);
-      expect(d.draw(d.w, d.d, { wood: 'a', woodDark: 'a', fabric: 'a', fabricDark: 'a', cushion: 'a', linen: 'a', white: 'a', metal: 'a', plant: 'a', plantDark: 'a', glass: 'a', line: 'a', car: 'a', rug: 'a' })).toMatch(/^</);
+      expect(d.draw(d.w, d.d, { id: 't', wood: 'a', woodDark: 'a', fabric: 'a', fabricDark: 'a', cushion: 'a', linen: 'a', white: 'a', metal: 'a', plant: 'a', plantDark: 'a', glass: 'a', line: 'a', car: 'a', rug: 'a', accent: 'a', accent2: 'a', stone: 'a' })).toMatch(/^</);
     }
   });
 });
