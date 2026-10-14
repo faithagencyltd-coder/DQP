@@ -3,7 +3,7 @@
 
 import { balance } from './finance';
 import { groupMetre, type MetreLine, type MetreRules } from './metre';
-import { roundMoney } from './money';
+import { formatMoney, formatNumber, roundMoney } from './money';
 import { isLate, projectProgress, plannedProgress, type ProgressMethod, type TaskLike } from './planning';
 import { receivedValue, reconcile, restockAlerts } from './purchasing';
 
@@ -253,3 +253,14 @@ export function siteReport(project: RProject, tasks: RTask[], dailies: RDaily[],
     limits,
   };
 }
+
+/** Valeur affichée (écran, PDF) selon le type de colonne. */
+export function formatCell(v: Cell, type: ColType, cur: string): string {
+  if (v === null || v === undefined || v === '') return '—';
+  if (type === 'money') return formatMoney(Number(v), cur, false);
+  if (type === 'number') return formatNumber(Number(v), 3);
+  if (type === 'pct') return `${formatNumber(Number(v), 1)} %`;
+  if (type === 'date') return String(v).slice(0, 10).split('-').reverse().join('/');
+  return String(v);
+}
+

@@ -65,6 +65,7 @@ export function LoginPage() {
 
 export function SignupPage() {
   const [params] = useSearchParams();
+  const nav = useNavigate();
   const [f, setF] = useState({ first: '', last: '', email: params.get('email') ?? '', phone: '', password: '', password2: '' });
   const [terms, setTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +93,8 @@ export function SignupPage() {
     if (error) return setError(errorMessage(error));
     // Supabase ne révèle pas si l'adresse existe déjà (identités vides) : on reste neutre.
     if (data.user && !data.session) setSent(f.email.trim());
+    // Confirmation automatique (version de test locale) : la session est ouverte d'emblée.
+    else if (data.session) nav(params.get('invitation') ? `/invitation/${params.get('invitation')}` : '/app', { replace: true });
   };
 
   if (sent) {

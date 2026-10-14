@@ -1,0 +1,49 @@
+PLANORA BTP - VERSION DE TEST LOCALE (Windows 10 / 11, 64 bits)
+================================================================
+
+Cette version fonctionne entierement sur votre ordinateur : base de donnees, serveur et
+application. Rien n'est envoye sur Internet. Elle sert a TESTER toutes les fonctions avant la
+mise en ligne sur Supabase.
+
+0. OU INSTALLER
+   Placez le dossier PLANORA-BTP de preference a la racine du disque : C:\PLANORA-BTP
+   (un chemin court, sans accents ni espaces, evite les soucis avec la base de donnees).
+
+1. DEMARRER
+   Double-cliquez sur DEMARRER-PLANORA.bat.
+   - Au premier lancement, la base est creee (environ 30 secondes) et une adresse e-mail
+     d'administrateur vous est demandee : saisissez la VOTRE pour avoir l'espace
+     « Administration PLANORA » (activation des offres, fonctions IA, assistance).
+     Laissez vide si vous n'en avez pas besoin.
+   - Votre navigateur s'ouvre sur http://localhost:54320/
+   - Si Windows affiche « Windows a protege votre ordinateur », cliquez sur
+     « Informations complementaires » puis « Executer quand meme ».
+   - Si le pare-feu Windows pose une question, vous pouvez refuser : tout reste sur ce PC.
+
+2. CREER VOTRE COMPTE
+   Cliquez sur « Creer un compte » avec l'adresse e-mail saisie a l'etape 1 (pour etre
+   administrateur). En local, l'adresse est confirmee automatiquement : aucun e-mail n'est
+   envoye.
+   Pour tester les offres payantes (achats, stocks, planning, plans...) :
+   Abonnement > choisir « Professionnelle » > envoyer la demande, puis
+   Administration PLANORA > Demandes d'abonnement > « Reglement recu : activer ».
+
+3. ARRETER
+   Double-cliquez sur ARRETER-PLANORA.bat. Vos donnees sont conservees dans le dossier
+   « donnees » et retrouvees au prochain demarrage.
+
+4. REPARTIR DE ZERO
+   Arretez PLANORA, puis supprimez le dossier « donnees ».
+
+LIMITES DE CETTE VERSION LOCALE
+   - Pas d'envoi d'e-mail (inscription confirmee automatiquement).
+   - Rendu de plans par IA : desactive (il faut une cle d'un fournisseur IA, en ligne).
+   - Paiement en ligne : a venir (activation des offres par l'administration).
+   - Ports utilises sur ce PC : 54320 (application), 54329 (base), 54331 (service interne).
+
+EN CAS DE PROBLEME
+   Les journaux sont dans le dossier « donnees » : postgres.log, serveur.log, initdb.log.
+   Envoyez-les avec une capture d'ecran.
+
+Composants inclus (licences libres) : PostgreSQL 16, PostgREST 12, Node.js 22,
+runtime Microsoft Visual C++ (redistribuable).

@@ -5,21 +5,12 @@ import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { toCsv } from '../engine/csv';
-import { currency as currencyInfo, formatMoney, formatNumber } from '../engine/money';
-import { periodLabel, rawCell, type Cell, type ColType, type Report } from '../engine/reports';
+import { currency as currencyInfo } from '../engine/money';
+import { formatCell, periodLabel, rawCell, type ColType, type Report } from '../engine/reports';
 import type { Organization } from '../lib/types';
 import { footer, header, lastY, LINE, loadLogo, M, MUTED, NAVY, pdfText } from './pdf';
 
 const t = pdfText;
-
-export function formatCell(v: Cell, type: ColType, cur: string): string {
-  if (v === null || v === undefined || v === '') return '—';
-  if (type === 'money') return formatMoney(Number(v), cur, false);
-  if (type === 'number') return formatNumber(Number(v), 3);
-  if (type === 'pct') return `${formatNumber(Number(v), 1)} %`;
-  if (type === 'date') return String(v).slice(0, 10).split('-').reverse().join('/');
-  return String(v);
-}
 
 const meta = (r: Report, at: Date): [string, string][] => [
   ['Généré le', at.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })],

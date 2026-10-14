@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { INVOICE_KIND_LABEL } from '../../engine/finance';
 import {
-  budgetComparison, expensesReport, financialReport, invoicesSummary, lotQuantities, paymentsReport, periodLabel, progressReport,
+  budgetComparison, expensesReport, formatCell, financialReport, invoicesSummary, lotQuantities, paymentsReport, periodLabel, progressReport,
   purchasesReport, quotesSummary, siteReport, stockReport, type Names, type Period, type Report,
 } from '../../engine/reports';
 import { useRows } from '../../lib/api';
@@ -16,7 +16,6 @@ import { EXPENSE_CATEGORIES, EXPENSE_STATUS, INVOICE_STATUS, ORDER_STATUS, PAYME
 import { useOrg } from '../../lib/session';
 import type { Contact, DailyReport, Expense, Invoice, MetreDoc, Module, Payment, PriceItem, Project, ProjectLot, PurchaseOrder, Quote, Reserve, StockLevel, Task, Warehouse } from '../../lib/types';
 import { Button, Card, EmptyState, Field, Input, Notice, PageHeader, Select, Spinner, useToast } from '../../ui';
-import { formatCell } from '../../docs/report-export';
 
 type Kind = 'chantier' | 'financier' | 'depenses' | 'avancement' | 'achats' | 'stocks' | 'devis' | 'factures' | 'paiements' | 'quantitatif' | 'budget';
 const CATALOG: { id: Kind; label: string; needs: Module[]; project: 'aucun' | 'option' | 'requis'; period: boolean; hint: string }[] = [

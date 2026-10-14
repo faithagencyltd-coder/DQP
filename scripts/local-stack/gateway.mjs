@@ -15,6 +15,13 @@ const PORT = Number(process.env.GATEWAY_PORT ?? 54320);
 const REST = process.env.POSTGREST_URL ?? 'http://127.0.0.1:54331';
 const SECRET = process.env.JWT_SECRET ?? 'planora-local-dev-secret-at-least-32-characters!!';
 const FILES = process.env.FILES_DIR ?? '/tmp/planora-files';
+// Paquet de test local (Windows) : le serveur sert aussi le site, et les inscriptions sont
+// confirmées d'office (aucun service de courriel en local).
+const STATIC = process.env.STATIC_DIR ?? null;
+const AUTO_CONFIRM = process.env.AUTO_CONFIRM === '1';
+// Routes de recette (/__dev) : coupées dans le paquet de test local.
+const DEV_ROUTES = process.env.DEV_ROUTES !== '0';
+const HOST = process.env.LISTEN_HOST ?? undefined;
 const pool = new pg.Pool({ host: process.env.PGHOST, port: Number(process.env.PGPORT ?? 5432), user: 'postgres', database: process.env.PGDATABASE ?? 'planora_dev' });
 fs.mkdirSync(FILES, { recursive: true });
 
@@ -100,7 +107,7 @@ async function asUser(claims, fn) {
 
 async function auth(req, res, url) {
   const route = url.pathname.replace('/auth/v1', '');
-  if (route === '/settings') return send(res, 200, { external: { email: true }, disable_signup: false, mailer_autoconfirm: false });
+  if (route === '/settings') return send(res, 200, { external: { email: true }, disable_signup: false, mailer_autoconfirm: AUTO_CONFIRM });
   if (route === '/signup' && req.method === 'POST') {
     const b = json(await readBody(req));
     if (!b.email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(b.email)) return authErr(res, 400, 'Unable to validate email address: invalid format', 'validation_failed');
@@ -112,6 +119,10 @@ async function auth(req, res, url) {
       `insert into auth.users (email, encrypted_password, raw_user_meta_data, confirmation_token)
        values ($1, extensions.crypt($2, extensions.gen_salt('bf')), $3, $4) returning *`,
       [b.email.toLowerCase(), b.password, b.data ?? {}, token]);
+    if (AUTO_CONFIRM) {
+      const c = await pool.query('update auth.users set email_confirmed_at = now(), confirmation_token = null where id = $1 returning *', [r.rows[0].id]);
+      return send(res, 200, session(c.rows[0]));
+    }
     const redirect = b.options?.emailRedirectTo ?? url.searchParams.get('redirect_to') ?? '';
     console.log(`[courriel de confirmation] ${b.email} → http://localhost:${PORT}/auth/v1/verify?type=signup&token=${token}&redirect_to=${encodeURIComponent(redirect)}`);
     return send(res, 200, userJson(r.rows[0]));
@@ -263,6 +274,16 @@ async function proxyRest(req, res, url) {
   res.end(out);
 }
 
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.txt': 'text/plain' };
+function serveStatic(res, pathname) {
+  const root = path.resolve(STATIC);
+  let file = path.resolve(root, '.' + decodeURIComponent(pathname));
+  if (!file.startsWith(root)) return send(res, 403, { message: 'interdit' });
+  if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(root, 'index.html');
+  res.writeHead(200, { 'content-type': MIME[path.extname(file).toLowerCase()] ?? 'application/octet-stream', 'cache-control': file.endsWith('index.html') ? 'no-cache' : 'max-age=3600' });
+  fs.createReadStream(file).pipe(res);
+}
+
 http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   res.setHeader('access-control-allow-origin', '*');
@@ -274,6 +295,7 @@ http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/auth/v1')) return await auth(req, res, url);
     if (url.pathname.startsWith('/storage/v1')) return await storage(req, res, url);
     if (url.pathname === '/functions/v1/rendu-ia' && req.method === 'POST') return await renduIa(req, res);
+    if (url.pathname.startsWith('/__dev/') && !DEV_ROUTES) return send(res, 404, { message: 'introuvable' });
     if (url.pathname === '/__dev/confirm') {
       await pool.query('update auth.users set email_confirmed_at = now() where lower(email) = lower($1)', [url.searchParams.get('email')]);
       return send(res, 200, { ok: true });
@@ -282,9 +304,13 @@ http.createServer(async (req, res) => {
       const r = await pool.query((await readBody(req)).toString());
       return send(res, 200, r.rows ?? []);
     }
+    if (STATIC && (req.method === 'GET' || req.method === 'HEAD')) return serveStatic(res, url.pathname);
     send(res, 404, { message: 'introuvable' });
   } catch (e) {
     console.error(e);
     send(res, 500, { message: e.message });
   }
-}).listen(PORT, () => console.log(`Pile locale PLANORA BTP : http://localhost:${PORT}`));
+}).listen(PORT, HOST, () => {
+  console.log(`Pile locale PLANORA BTP : http://localhost:${PORT}`);
+  if (process.env.PID_FILE) fs.writeFileSync(process.env.PID_FILE, String(process.pid));
+});

@@ -102,3 +102,23 @@ node scripts/e2e.mjs /tmp/captures
 
 Critère : chaque étape doit réussir sans message d’erreur, et aucun montant ne doit différer entre
 l’écran, le PDF et l’Excel.
+
+## 5. Paquet de test local pour Windows — `scripts/local-package/`
+
+Pour essayer PLANORA BTP sur un PC Windows 10 / 11 (64 bits) sans rien installer ni rien mettre en
+ligne : PostgreSQL 16, PostgREST 12, Node.js 22 et le runtime Visual C++ sont embarqués.
+
+```bash
+sh scripts/local-package/build.sh /chemin/de/travail   # produit 3 fichiers dans <travail>/sortie
+```
+
+- `ASSEMBLER-PLANORA.bat` + `PLANORA-BTP-local.zip.part0` + `.part1` : placer les trois dans un même
+  dossier, double-cliquer sur `ASSEMBLER-PLANORA.bat`, puis sur `PLANORA-BTP\DEMARRER-PLANORA.bat`.
+- Premier lancement : création de la base (migrations appliquées une seule fois, suivies dans
+  `planora_local.applied`), saisie facultative de l'adresse de l'administrateur de la plateforme.
+- Le serveur n'écoute que sur ce PC (127.0.0.1), sert le site, confirme les inscriptions d'office
+  (aucun courriel en local) et désactive les routes de recette (`/__dev`).
+- Données conservées dans `PLANORA-BTP\donnees` ; `ARRETER-PLANORA.bat` arrête tout.
+- Vérification : `scripts/local-package/smoke.mjs` (inscription, entreprise, espace administrateur)
+  sur le paquet réassemblé, avec une base vierge. Le lancement des `.bat` lui-même n'a pas pu être
+  exécuté ici (pas de Windows dans l'environnement de construction).
