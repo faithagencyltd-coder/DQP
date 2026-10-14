@@ -38,6 +38,7 @@ const StocksPage = lazy(() => import('./pages/app/Stocks').then((m) => ({ defaul
 const PlanningPage = lazy(() => import('./pages/app/Planning').then((m) => ({ default: m.PlanningPage })));
 const DailyReportEditor = lazy(() => import('./pages/app/DailyReport').then((m) => ({ default: m.DailyReportEditor })));
 const ReportsPage = lazy(() => import('./pages/app/Reports').then((m) => ({ default: m.ReportsPage })));
+const SupportPage = lazy(() => import('./pages/app/Support').then((m) => ({ default: m.SupportPage })));
 const AdminPage = lazy(() => import('./pages/app/Admin').then((m) => ({ default: m.AdminPage })));
 
 function NotConfigured() {
@@ -109,6 +110,7 @@ export function App() {
         <Route path="depenses" element={page(<ExpensesPage />)} />
         <Route path="planning" element={page(<PlanningPage />)} />
         <Route path="rapports" element={page(<ReportsPage />)} />
+        <Route path="assistance" element={page(<SupportPage />)} />
         <Route path="planning/rapports/:id" element={page(<DailyReportEditor />)} />
         <Route path="assistant" element={page(<ComingSoon module="assistant" />)} />
         <Route path="*" element={<Navigate to="/app" replace />} />

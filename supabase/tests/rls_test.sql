@@ -431,6 +431,36 @@ select tests.check((select count(*) from public.tasks) = 0 and (select count(*) 
 select tests.fails(format('insert into public.tasks (org_id, project_id, title, start_date, end_date) values (%L, %L, ''X'', ''2026-11-10'', ''2026-11-11'')', tests.id('org2'), tests.id('prj')), 'row-level security', 'A ne crée pas de tâche chez B');
 select tests.fails(format('insert into public.tasks (org_id, project_id, title, start_date, end_date) values (%L, (select id from public.projects where name = ''Villa Fidjrossè''), ''X'', ''2026-11-10'', ''2026-11-11'')', tests.id('org1')), 'row-level security', 'planning hors de l''offre Découverte : refusé');
 
+-- ------------------------------------------------------------ notifications, assistance, historique d'abonnement
+select tests.login('00000000-0000-0000-0000-00000000000b');
+select tests.fails(format('insert into public.notifications (org_id, user_id, kind, title) values (%L, auth.uid(), ''devis'', ''Faux'')', tests.id('org2')), 'permission denied', 'une notification ne se fabrique pas côté client');
+insert into public.tasks (org_id, project_id, title, start_date, end_date) values (tests.id('org2')::uuid, tests.id('prj')::uuid, 'Ferraillage en retard', current_date - 10, current_date - 2);
+insert into public.stock_thresholds (org_id, item_id, warehouse_id, min_qty) values (tests.id('org2')::uuid, (select id from public.price_items where designation = 'Ciment CPJ 35'), (select id from public.warehouses where name = 'Dépôt central'), 100);
+select tests.check(public.refresh_notifications(tests.id('org2')::uuid) >= 2, 'contrôle quotidien : notifications créées');
+select tests.check((select count(*) from public.notifications where kind = 'tache_retard' and title = 'Tâche en retard') = 1 and (select count(*) from public.notifications where kind = 'stock') = 1, 'tâche en retard et stock insuffisant notifiés');
+select tests.check(public.refresh_notifications(tests.id('org2')::uuid) = 0, 'contrôle relancé : aucun doublon');
+insert into public.notification_prefs (user_id, kind, in_app) values (auth.uid(), 'tache_retard', false);
+insert into public.tasks (org_id, project_id, title, start_date, end_date) values (tests.id('org2')::uuid, tests.id('prj')::uuid, 'Autre retard', current_date - 5, current_date - 1);
+select public.refresh_notifications(tests.id('org2')::uuid);
+select tests.check((select count(*) from public.notifications where kind = 'tache_retard') = 1, 'préférence respectée : type d''événement désactivé');
+select tests.fails(format('insert into public.notification_prefs (user_id, kind) values (%L, ''devis'')', '00000000-0000-0000-0000-00000000000a'), 'row-level security', 'on ne règle pas les préférences d''un autre');
+update public.notifications set read_at = now() where kind = 'stock';
+select tests.check((select read_at is not null from public.notifications where kind = 'stock'), 'notification marquée comme lue');
+select tests.fails('update public.notifications set title = ''x''', 'permission denied', 'le contenu d''une notification ne se modifie pas');
+insert into tests.ids values ('ticket', public.open_ticket(tests.id('org2')::uuid, 'Export Excel illisible', 'incident', 'haute', 'Le fichier ne s''ouvre pas.'));
+select tests.check((select reference like 'AST-____-0001' and status = 'ouvert' from public.support_tickets where id = tests.id('ticket')::uuid), 'demande d''assistance numérotée');
+select tests.fails(format('insert into public.support_messages (ticket_id, body) values (%L, ''x'')', tests.id('ticket')), 'permission denied', 'les messages passent par la fonction dédiée');
+select tests.check((select count(*) from public.subscription_events where org_id = tests.id('org2')::uuid and source in ('inscription', 'administration')) >= 2, 'historique d''abonnement : inscription puis activation');
+select tests.login('00000000-0000-0000-0000-00000000000a');
+select tests.check((select count(*) from public.notifications where org_id = tests.id('org2')::uuid) = 0, 'isolation : A ne voit pas les notifications de B');
+select tests.check((select count(*) from public.support_tickets) = 1, 'l''administration de la plateforme voit la demande');
+select public.post_ticket_message(tests.id('ticket')::uuid, 'Pouvez-vous envoyer le fichier ?');
+select tests.check((select from_platform from public.support_messages where ticket_id = tests.id('ticket')::uuid order by created_at desc limit 1), 'réponse marquée « assistance PLANORA BTP »');
+select tests.check((select open_tickets from public.admin_overview2()) = 1, 'tableau de bord administrateur : demandes ouvertes');
+select tests.login('00000000-0000-0000-0000-00000000000b');
+select tests.check((select count(*) from public.notifications where kind = 'support') = 1 and (select status from public.support_tickets) = 'en_cours', 'le demandeur est notifié ; demande prise en charge');
+select tests.fails('select * from public.admin_overview2()', 'Réservé', 'statistiques avancées réservées à la plateforme');
+
 -- ------------------------------------------------------------ double authentification
 reset role;
 insert into auth.mfa_factors (user_id, status) values ('00000000-0000-0000-0000-00000000000b', 'verified');

@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Copy, ImageUp, KeyRound, Link2, LogOut, MessageCircle, Plus, RotateCcw, ShieldCheck, Trash2, UserMinus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -13,26 +14,30 @@ import { Badge, Button, Card, Confirm, Field, Input, Modal, Notice, PageHeader, 
 import { Allowed } from '../../ui/guard';
 import { passwordProblem } from '../public/AuthPages';
 import { checkFile } from './Documents';
+import { NotificationPrefs } from '../../layouts/Notifications';
 
-type Tab = 'entreprise' | 'equipe' | 'permissions' | 'profil' | 'securite';
+type Tab = 'entreprise' | 'equipe' | 'permissions' | 'profil' | 'notifications' | 'securite';
 
 export function SettingsPage() {
   const { can } = useOrg();
-  const [tab, setTab] = useState<Tab>('entreprise');
+  const [sp] = useSearchParams();
+  const [tab, setTab] = useState<Tab>((sp.get('onglet') as Tab) || 'entreprise');
   return (
     <>
-      <PageHeader title="Paramètres" subtitle="Entreprise, équipe, permissions, profil et sécurité." />
+      <PageHeader title="Paramètres" subtitle="Entreprise, équipe, permissions, profil, notifications et sécurité." />
       <Tabs value={tab} onChange={setTab} items={[
         { id: 'entreprise', label: 'Entreprise' },
         { id: 'equipe', label: 'Équipe', hidden: !can('equipe', 'consulter') },
         { id: 'permissions', label: 'Rôles et permissions', hidden: !can('equipe', 'consulter') },
         { id: 'profil', label: 'Mon profil' },
+        { id: 'notifications', label: 'Notifications' },
         { id: 'securite', label: 'Sécurité' },
       ]} />
       {tab === 'entreprise' && <CompanySettings />}
       {tab === 'equipe' && <TeamSettings />}
       {tab === 'permissions' && <PermissionMatrix />}
       {tab === 'profil' && <ProfileSettings />}
+      {tab === 'notifications' && <Card title="Notifications" subtitle="Choisissez les événements qui vous sont signalés"><NotificationPrefs /></Card>}
       {tab === 'securite' && <SecuritySettings />}
     </>
   );

@@ -9,6 +9,7 @@ import { errorMessage } from '../../lib/errors';
 import { COUNTRIES, MODULE_LABEL, fmtDate, fmtDateTime } from '../../lib/labels';
 import { useAuth } from '../../lib/session';
 import { useFeatures } from '../../lib/features';
+import { TICKET_CATEGORY, TICKET_STATUS, TicketThread, useTickets, type Ticket } from './Support';
 import type { Module, Organization, Plan } from '../../lib/types';
 import { formatMoney, parseNumber } from '../../engine/money';
 import { Badge, Button, Card, Checkbox, DataTable, Field, Input, Modal, Notice, PageHeader, SearchInput, Select, Spinner, Stat, Tabs, Textarea, useToast } from '../../ui';
@@ -17,11 +18,11 @@ interface Req { id: string; org_id: string; plan_id: string; period: string; amo
 
 export function AdminPage() {
   const { isPlatformAdmin, adminLoading, session } = useAuth();
-  const [tab, setTab] = useState<'entreprises' | 'demandes' | 'offres' | 'ia'>('entreprises');
+  const [tab, setTab] = useState<'entreprises' | 'demandes' | 'offres' | 'ia' | 'assistance' | 'journal'>('entreprises');
   const overview = useQuery({ queryKey: ['admin-overview'], enabled: isPlatformAdmin, queryFn: async () => {
-    const { data, error } = await supabase.rpc('admin_overview');
+    const { data, error } = await supabase.rpc('admin_overview2');
     if (error) throw error;
-    return data[0] as { accounts: number; organizations: number; active_subscriptions: number; expired: number; trials: number; storage_mb: number };
+    return data[0] as { accounts: number; active_users: number; organizations: number; active_subscriptions: number; expired: number; trials: number; suspended: number; storage_mb: number; revenue_month: number; revenue_total: number; failed_payments: number; pending_requests: number; open_tickets: number; incidents_30d: number };
   } });
   const ai = useQuery({ queryKey: ['admin-ai'], enabled: isPlatformAdmin, queryFn: async () => {
     const { data, error } = await supabase.rpc('admin_ai_overview');
@@ -35,19 +36,24 @@ export function AdminPage() {
     <>
       <PageHeader title="Administration PLANORA BTP" subtitle="Réservé à l’équipe de la plateforme. Le contenu des entreprises n’est pas accessible depuis cet espace." />
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-6">
-        <Stat label="Comptes" value={o?.accounts ?? '…'} />
-        <Stat label="Entreprises" value={o?.organizations ?? '…'} />
-        <Stat label="Abonnements actifs" value={o?.active_subscriptions ?? '…'} tone="ok" />
-        <Stat label="Essais en cours" value={o?.trials ?? '…'} tone="warn" />
-        <Stat label="Stockage utilisé" value={o ? `${String(o.storage_mb).replace('.', ',')} Mo` : '…'} hint={o ? `${o.expired} abonnement(s) échu(s)` : undefined} />
+        <Stat label="Comptes" value={o?.accounts ?? '…'} hint={o ? `${o.active_users} actif(s) sur 30 jours` : undefined} />
+        <Stat label="Entreprises" value={o?.organizations ?? '…'} hint={o ? `${o.trials} en essai · ${o.suspended} suspendue(s)` : undefined} />
+        <Stat label="Abonnements actifs" value={o?.active_subscriptions ?? '…'} tone="ok" hint={o ? `${o.expired} abonnement(s) échu(s)` : undefined} />
+        <Stat label="Revenus enregistrés" value={o ? formatMoney(o.revenue_month, 'XOF') : '…'} hint={o ? `ce mois · ${formatMoney(o.revenue_total, 'XOF')} au total (règlements confirmés à la main)` : undefined} tone="signal" />
+        <Stat label="Règlements refusés" value={o?.failed_payments ?? '…'} tone={o?.failed_payments ? 'bad' : 'navy'} hint={o ? `${o.pending_requests} demande(s) en attente` : undefined} />
+        <Stat label="Stockage utilisé" value={o ? `${String(o.storage_mb).replace('.', ',')} Mo` : '…'} />
         <Stat label="Consommation IA du mois" value={ai.data ? `${ai.data.units_month} unités` : '…'} hint={ai.data ? `${ai.data.renders_ok} rendu(s) réussi(s), ${ai.data.renders_failed} échec(s)` : undefined} />
+        <Stat label="Incidents techniques (30 j)" value={o?.incidents_30d ?? '…'} tone={o?.incidents_30d ? 'warn' : 'navy'} hint="opérations IA en échec" />
+        <Stat label="Demandes d’assistance" value={o?.open_tickets ?? '…'} tone={o?.open_tickets ? 'warn' : 'navy'} hint="ouvertes ou en cours" />
       </div>
-      <Tabs value={tab} onChange={setTab} items={[{ id: 'entreprises', label: 'Entreprises' }, { id: 'demandes', label: 'Demandes d’abonnement' }, { id: 'offres', label: 'Offres' }, { id: 'ia', label: 'Fonctions IA' }]} />
+      <Tabs value={tab} onChange={setTab} items={[{ id: 'entreprises', label: 'Entreprises' }, { id: 'demandes', label: 'Demandes d’abonnement' }, { id: 'offres', label: 'Offres' }, { id: 'ia', label: 'Fonctions IA' }, { id: 'assistance', label: `Assistance${o?.open_tickets ? ` (${o.open_tickets})` : ''}` }, { id: 'journal', label: 'Journal technique' }]} />
       {tab === 'entreprises' && <Orgs />}
       {tab === 'demandes' && <Requests />}
       {tab === 'offres' && <Plans />}
       {tab === 'ia' && <Features />}
-      <Notice tone="navy" className="mt-4" title="Non disponible dans cette version">Revenus encaissés en ligne, paiements échoués, consommation IA, incidents et demandes d’assistance : avec les modules Paiement, Assistant IA et Support.</Notice>
+      {tab === 'assistance' && <AdminSupport />}
+      {tab === 'journal' && <TechLog />}
+      <Notice tone="navy" className="mt-4" title="Paiement en ligne : à venir">Les revenus affichés sont les règlements confirmés à la main lors du traitement des demandes d’abonnement ; aucun prestataire de paiement en ligne n’est encore branché.</Notice>
     </>
   );
 }
@@ -205,5 +211,48 @@ function Plans() {
         </Modal>
       )}
     </div>
+  );
+}
+
+function AdminSupport() {
+  const tickets = useTickets();
+  const [filter, setFilter] = useState<'actives' | 'toutes'>('actives');
+  const [open, setOpen] = useState<Ticket | null>(null);
+  const list = (tickets.data ?? []).filter((t) => filter === 'toutes' || t.status === 'ouvert' || t.status === 'en_cours');
+  return (
+    <Card bodyClass="p-0" title="Demandes d’assistance" actions={<Select aria-label="Filtre des demandes" value={filter} onChange={(e) => setFilter(e.target.value as 'actives' | 'toutes')} className="!w-40 !py-1 text-[13px]"><option value="actives">À traiter</option><option value="toutes">Toutes</option></Select>}>
+      {tickets.isLoading ? <Spinner /> : (
+        <DataTable rows={list} onRowClick={setOpen} columns={[
+          { key: 'ref', label: 'Réf.', render: (t) => <span className="tabular text-muted">{t.reference}</span> },
+          { key: 'org', label: 'Entreprise', render: (t) => t.organizations?.name ?? '—' },
+          { key: 'subject', label: 'Objet', render: (t) => <b className="text-navy-900">{t.subject}</b> },
+          { key: 'cat', label: 'Catégorie', render: (t) => TICKET_CATEGORY[t.category], hideOnMobile: true },
+          { key: 'prio', label: 'Urgence', render: (t) => t.priority === 'normale' ? 'Normale' : <Badge tone="bad">{t.priority === 'haute' ? 'Haute' : 'Bloquante'}</Badge> },
+          { key: 'upd', label: 'Activité', render: (t) => fmtDateTime(t.updated_at), hideOnMobile: true },
+          { key: 'status', label: 'Statut', render: (t) => <Badge tone={TICKET_STATUS[t.status].tone}>{TICKET_STATUS[t.status].label}</Badge> },
+        ]} />
+      )}
+      {open && <TicketThread admin ticket={(tickets.data ?? []).find((t) => t.id === open.id) ?? open} onClose={() => setOpen(null)} />}
+    </Card>
+  );
+}
+
+function TechLog() {
+  const log = useQuery({ queryKey: ['admin-tech-log'], queryFn: async () => {
+    const { data, error } = await supabase.rpc('admin_tech_log', { p_limit: 200 });
+    if (error) throw error;
+    return ((data ?? []) as { at: string; org_name: string; kind: string; detail: string }[]).map((r, i) => ({ ...r, id: String(i) }));
+  } });
+  return (
+    <Card bodyClass="p-0" title="Journal technique" subtitle="Abonnements, demandes traitées et échecs d’opérations ; sans contenu métier des entreprises">
+      {log.isLoading ? <Spinner /> : (
+        <DataTable rows={log.data ?? []} columns={[
+          { key: 'at', label: 'Date', render: (r) => fmtDateTime(r.at) },
+          { key: 'org', label: 'Entreprise', render: (r) => r.org_name },
+          { key: 'kind', label: 'Événement', render: (r) => <Badge tone={r.kind.includes('échec') || r.kind.includes('refusee') ? 'bad' : 'navy'}>{r.kind}</Badge> },
+          { key: 'detail', label: 'Détail', render: (r) => <span className="text-[12.5px]">{r.detail}</span> },
+        ]} />
+      )}
+    </Card>
   );
 }

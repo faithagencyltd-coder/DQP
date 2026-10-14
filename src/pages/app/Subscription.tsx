@@ -30,6 +30,7 @@ export function SubscriptionPage() {
   const plans = useQuery({ queryKey: ['plans'], queryFn: async () => ((await supabase.from('subscription_plans').select('*').eq('active', true).order('sort')).data ?? []) as Plan[] });
   const usage = useQuery({ queryKey: ['usage', org?.id], enabled: !!org, queryFn: async () => ((await supabase.rpc('org_usage', { p_org: org!.id })).data?.[0] ?? null) as { users: number; projects: number; documents: number; storage_bytes: number } | null });
   const requests = useRows<Request>('billing_requests', org?.id, { order: ['created_at', false] });
+  const history = useRows<{ id: number; plan_id: string; status: string; period: string | null; ends_at: string | null; amount: number | null; currency: string | null; source: string; note: string | null; created_at: string }>('subscription_events', org?.id, { order: ['created_at', false], limit: 100 });
   const [choice, setChoice] = useState<Plan | null>(null);
   const cancel = useAction((id: string) => rpc('cancel_subscription_request', { p_request: id }), { success: 'Demande annulée.', invalidate: [['billing_requests']] });
   if (!org || !plan) return <Spinner />;
@@ -37,7 +38,7 @@ export function SubscriptionPage() {
   const pending = (requests.data ?? []).find((r) => r.status === 'en_attente');
   return (
     <>
-      <PageHeader title="Abonnement" subtitle="Votre offre, son utilisation et l’historique de vos demandes." />
+      <PageHeader title="Abonnement" subtitle="Votre offre, son utilisation, vos demandes et l’historique de l’abonnement." />
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
         <Card title="Offre actuelle">
           <div className="flex flex-wrap items-center gap-2"><span className="text-[22px] font-bold text-navy-900">{plan.name}</span><Badge tone={st[1]}>{st[0]}</Badge>{org.plan_period && <Badge>{org.plan_period === 'an' ? 'annuel' : 'mensuel'}</Badge>}</div>
@@ -85,6 +86,15 @@ export function SubscriptionPage() {
             <span className="flex-1">{fmtDateTime(r.created_at)} · <b>{(plans.data ?? []).find((p) => p.id === r.plan_id)?.name ?? r.plan_id}</b> {r.period === 'an' ? 'annuel' : 'mensuel'} · {formatMoney(r.amount, r.currency)}{r.admin_note ? ` — ${r.admin_note}` : ''}</span>
             <Badge tone={REQ[r.status as keyof typeof REQ]?.[1]}>{REQ[r.status as keyof typeof REQ]?.[0]}</Badge>
             {r.status === 'en_attente' && <Allowed module="abonnement" action="modifier"><Button size="sm" onClick={() => cancel.mutate(r.id)}>Annuler</Button></Allowed>}
+          </div>
+        ))}
+      </Card>
+      <Card title="Historique de l’abonnement" subtitle="Inscription, activations, renouvellements, suspensions et échéances" className="mt-6" bodyClass="p-0">
+        {!(history.data ?? []).length ? <p className="p-4 text-[13.5px] text-muted">Aucun événement.</p> : (history.data ?? []).map((h) => (
+          <div key={h.id} className="flex flex-wrap items-center gap-3 border-b border-line-2 px-4 py-3 text-[13.5px] last:border-0">
+            <span className="flex-1">{fmtDateTime(h.created_at)} · <b>{(plans.data ?? []).find((p) => p.id === h.plan_id)?.name ?? h.plan_id}</b>{h.period ? ` ${h.period === 'an' ? 'annuel' : 'mensuel'}` : ''}{h.ends_at ? ` · jusqu’au ${fmtDate(h.ends_at)}` : ''}{h.amount !== null ? ` · ${formatMoney(h.amount, h.currency ?? 'XOF')}` : ''}{h.note ? ` — ${h.note}` : ''}</span>
+            <Badge tone="grey">{h.source === 'inscription' ? 'Inscription' : h.source === 'demande' ? 'Sur demande' : 'Par l’administration'}</Badge>
+            <Badge tone={STATUS[h.status as keyof typeof STATUS]?.[1]}>{STATUS[h.status as keyof typeof STATUS]?.[0] ?? h.status}</Badge>
           </div>
         ))}
       </Card>

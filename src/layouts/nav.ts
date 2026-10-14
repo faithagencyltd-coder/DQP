@@ -2,7 +2,7 @@
 // module (pour l'adapter au rôle) et son état réel : disponible ou à venir (phase prévue).
 import {
   Banknote, BarChart3, Bot, Boxes, Briefcase, Building2, CalendarRange, Calculator, ClipboardList, CreditCard, FileSpreadsheet, FileText,
-  FolderOpen, LayoutDashboard, Library, Map, Receipt, Settings, ShieldCheck, ShoppingCart, Users,
+  FolderOpen, LayoutDashboard, Library, LifeBuoy, Map, Receipt, Settings, ShieldCheck, ShoppingCart, Users,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 import type { Module } from '../lib/types';
@@ -38,6 +38,7 @@ export const NAV: NavItem[] = [
   { path: '/app/abonnement', label: 'Abonnement', icon: CreditCard, group: 'compte' },
   { path: '/app/parametres', label: 'Paramètres', icon: Settings, group: 'compte' },
   { path: '/app/journal', label: 'Journal d’activité', icon: ClipboardList, group: 'compte' },
+  { path: '/app/assistance', label: 'Assistance', icon: LifeBuoy, group: 'compte' },
   { path: '/app/admin', label: 'Administration PLANORA', icon: ShieldCheck, group: 'compte', adminOnly: true },
 ];
 

@@ -32,7 +32,7 @@ Trois niveaux de tests automatisés, plus une recette manuelle.
 ## 2. Sécurité et règles de la base — `sh supabase/tests/run.sh`
 
 Applique les migrations sur un PostgreSQL vierge, avec un environnement qui imite Supabase
-(`supabase/tests/shim_supabase.sql`), puis exécute `supabase/tests/rls_test.sql` : 170 contrôles, parmi lesquels :
+(`supabase/tests/shim_supabase.sql`), puis exécute `supabase/tests/rls_test.sql` : 187 contrôles, parmi lesquels :
 isolation entre entreprises (lecture, écriture, fichiers, journal), permissions par rôle et matrice
 modifiable, invitations, limites d’offre, abonnement échu en lecture seule, versions verrouillées, métré
 approuvé figé, historique des prix, demandes d’abonnement, administration sans accès au contenu,
@@ -53,7 +53,7 @@ PGHOST=/chemin/socket PGPORT=5432 sh supabase/tests/run.sh   # utilisateur « po
 
 Pilote un vrai navigateur sur une pile locale (`scripts/local-stack/`) : PostgreSQL avec les migrations,
 PostgREST, et une passerelle qui joue l’authentification, le stockage et la fonction serveur de Supabase.
-57 étapes : inscription, confirmation, entreprise, client, doublon, projet et lots, article et ouvrage composé,
+61 étapes : inscription, confirmation, entreprise, client, doublon, projet et lots, article et ouvrage composé,
 métré, DQE, devis, PDF, Excel, validation, nouvelle version, invitation d’un métreur sur téléphone,
 permissions, demande d’abonnement (offre Professionnelle), activation par l’administration ; facture
 d’acompte depuis le devis, émission, paiement partiel, PDF, dépense, onglet Finances du chantier ; dépôts,
@@ -62,7 +62,8 @@ du stock, inventaire avec écart, alerte sous le minimum, journal des mouvements
 dépendance non respectée et retard signalés, validation, avancement 25 %), rapport journalier avec effectifs,
 sorties de stock reprises, photo, soumission, validation et PDF, réserve levée puis validée, fiche chantier ;
 rapports (financier en PDF, Excel et CSV, rapport de chantier, comparatif budget / réel), historiques client et
-fournisseur, tableau de bord complet (budget du projet repris) ; puis plans :
+fournisseur, tableau de bord complet (budget du projet repris) ; notifications (tâche en retard, stock
+insuffisant), préférences, assistance avec réponse de la plateforme, historique d’abonnement ; puis plans :
 dessin (murs, cloison à la longueur saisie, porte, fenêtre), détection des pièces (26,18 m² et 32,98 m²),
 aménagement, rendu fidèle (PDF, DXF), rendu IA, métré tiré du plan, import d’un plan scanné, calibration,
 détection sur les traits de l’image, éditeur sur téléphone ; enfin tableau de bord et journal.

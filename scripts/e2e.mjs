@@ -574,6 +574,55 @@ try {
   await shot(page, '32-tableau-de-bord-complet');
   ok('tableau de bord complet : facturé, encaissé, reste, dépenses, marges, alertes, graphiques');
 
+  // ------------------------------------------------------------ notifications, assistance, abonnement
+  await page.reload();
+  const bell = page.locator('header:visible').getByRole('button', { name: /^Notifications \(([3-9]|\d\d+) non lue/ });
+  await bell.waitFor();
+  await bell.click();
+  await page.getByRole('dialog', { name: 'Notifications' }).getByText('Tâche en retard').waitFor();
+  await page.getByRole('dialog', { name: 'Notifications' }).getByText('Stock insuffisant').waitFor();
+  await shot(page, '33-notifications');
+  await page.getByRole('dialog', { name: 'Notifications' }).getByText('Tâche en retard').click();
+  await page.waitForURL(/#\/app\/planning/);
+  ok('notifications créées par le contrôle quotidien (tâche en retard, stock insuffisant), ouverture vers le planning');
+  await page.goto(BASE + '#/app/parametres?onglet=notifications');
+  await page.getByLabel(/^Stock insuffisant : dans l’application/).click();
+  await page.locator('input[aria-label^="Stock insuffisant : dans"]:not(:checked)').waitFor();
+  await page.reload();
+  await page.locator('input[aria-label^="Stock insuffisant : dans"]:not(:checked)').waitFor({ timeout: 8000 }).catch(() => { throw new Error('Préférence non enregistrée'); });
+  ok('préférences de notification enregistrées (e-mail signalé « à venir »)');
+
+  await nav(page, 'Assistance');
+  await page.getByRole('button', { name: 'Nouvelle demande', exact: true }).click();
+  dlg = page.getByRole('dialog');
+  await dlg.getByLabel(/^Objet/).fill('Question sur l’export Excel des rapports');
+  await dlg.getByLabel(/^Message/).fill('Peut-on choisir les colonnes exportées ?');
+  await dlg.getByRole('button', { name: 'Envoyer', exact: true }).click();
+  await page.getByRole('dialog').getByText(/AST-\d{4}-0001/).first().waitFor();
+  await page.keyboard.press('Escape');
+  await page3.reload();
+  await page3.getByRole('tab', { name: /^Assistance/ }).click();
+  await page3.getByRole('row', { name: /Question sur l’export Excel des rapports/ }).first().click();
+  await page3.getByRole('dialog').getByLabel('Votre message').fill('Pas encore : tous les champs sont exportés. Merci pour la suggestion.');
+  await page3.getByRole('dialog').getByRole('button', { name: 'Envoyer', exact: true }).click();
+  await page3.getByRole('dialog').getByText('Assistance PLANORA BTP ·').first().waitFor();
+  await page3.keyboard.press('Escape');
+  await page3.getByRole('tab', { name: 'Journal technique' }).click();
+  await page3.getByText('Journal technique').first().waitFor();
+  await page3.getByText('Revenus enregistrés').waitFor();
+  await shot(page3, '34-administration-enrichie');
+  await page.reload();
+  await page.locator('header:visible').getByRole('button', { name: /^Notifications/ }).click();
+  await page.getByRole('dialog', { name: 'Notifications' }).getByText('Réponse de l’assistance PLANORA BTP').click();
+  await page.getByText('Pas encore : tous les champs sont exportés. Merci pour la suggestion.').waitFor();
+  await shot(page, '35-assistance');
+  ok('assistance : demande AST, réponse de l’équipe PLANORA BTP notifiée au demandeur, administration enrichie');
+  await page.keyboard.press('Escape');
+  await nav(page, 'Abonnement');
+  await page.getByRole('heading', { name: 'Historique de l’abonnement' }).waitFor();
+  await page.getByText('Sur demande').first().waitFor();
+  ok('historique de l’abonnement : inscription puis activation sur demande');
+
   // ------------------------------------------------------------ plans : dessin, pièces, rendus
   await nav(page, 'Plans techniques');
   await page.getByRole('button', { name: 'Nouveau plan', exact: true }).click();

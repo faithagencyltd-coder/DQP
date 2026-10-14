@@ -1,4 +1,4 @@
-import { ChevronDown, LogOut, Menu as MenuIcon, X } from 'lucide-react';
+import { ChevronDown, LifeBuoy, LogOut, Menu as MenuIcon, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useOrg } from '../lib/session';
@@ -6,6 +6,7 @@ import { ROLE_LABEL, fmtDate } from '../lib/labels';
 import { Badge, cx, Menu } from '../ui';
 import { Logo, LogoMark } from '../ui/Logo';
 import { GROUP_LABEL, NAV, type NavItem } from './nav';
+import { NotificationBell } from './Notifications';
 
 function useVisibleNav(): NavItem[] {
   const { can } = useOrg();
@@ -135,6 +136,11 @@ export function AppShell() {
           <button aria-label="Ouvrir le menu" className="rounded-lg p-2 text-ink hover:bg-navy-50" onClick={() => setOpen(true)}><MenuIcon size={22} /></button>
           <LogoMark size={28} />
           <span className="truncate text-[14px] font-bold text-navy-900">PLANORA <span className="text-signal-500">BTP</span></span>
+          <span className="ml-auto"><NotificationBell /></span>
+        </header>
+        <header className="no-print hidden h-12 shrink-0 items-center justify-end gap-1 border-b border-line bg-white px-6 lg:flex">
+          <NavLink to="/app/assistance" className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-ink-2 hover:bg-navy-50"><LifeBuoy size={16} />Assistance</NavLink>
+          <NotificationBell />
         </header>
         <SubscriptionBanner />
         <main className="flex-1 overflow-y-auto">

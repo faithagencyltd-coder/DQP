@@ -80,6 +80,17 @@ Détail du module, des coûts et des limites : `docs/RENDU_PLANS.md`.
 | Fiche client : projets, devis, factures, paiements, solde et factures échues ; fiche fournisseur : articles fournis et tarifs, commandes, écarts de facturation, dépenses et justificatifs ; historique des modifications de la fiche | ✅ Terminé | recette 46 |
 | Rapports : chantier, financier, dépenses, avancement, achats, stocks, synthèse des devis, synthèse des factures, état des paiements, quantitatif par lot, comparatif budget prévisionnel / réel (DQE et BPU depuis leur module) ; période, projet, date de génération et limites ; PDF, Excel, CSV, impression | ✅ Terminé | 4 tests moteur, recette 44-45 |
 
+## Notifications, assistance, abonnement et administration (§23 à §25)
+
+| Élément | État | Vérification |
+|---|---|---|
+| Notifications dans l’application (cloche, non lues, lien vers l’élément) : collaborateur, devis envoyé / accepté / refusé, facture proche de l’échéance ou échue, paiement, tâche en retard, dépassement de budget, stock insuffisant, abonnement (échéance, activation, refus de règlement), quota IA, échec d’un rendu IA, réponse de l’assistance ; créées par la base, sans doublon, selon les droits | ✅ Terminé | contrôles SQL, recette 48 |
+| Préférences par type d’événement | ✅ Terminé | contrôles SQL, recette 49 |
+| Notifications par e-mail, SMS ou WhatsApp | ⚠️ **À venir** | préférence enregistrée ; aucun service d’envoi branché, rien n’est envoyé |
+| Assistance : demandes numérotées (AST-), échanges avec l’équipe PLANORA BTP, statuts, notification du demandeur | ✅ Terminé | contrôles SQL, recette 50 |
+| Historique de l’abonnement (inscription, activations, suspensions, échéances) et alertes avant échéance | ✅ Terminé | contrôles SQL, recette 51 |
+| Administration : comptes actifs, revenus enregistrés, règlements refusés, demandes en attente, incidents techniques, demandes d’assistance, journal technique | ✅ Terminé | contrôles SQL, recette 50 |
+
 ## Autres fonctions livrées
 
 | Élément | État |
@@ -108,5 +119,4 @@ Détail du module, des coûts et des limites : `docs/RENDU_PLANS.md`.
 |---|---|
 | Plans : comparaison de versions (§9.5), fichiers DWG (exporter en PDF) et import DXF, rotation du fond, outils de CAO avancés (arc, cercle, décalage, hachures), symboles électriques / plomberie / ventilation | Phase 3 (suite) |
 | Assistant IA, OCR (le quota IA est déjà en place) | Phase 4 |
-| Notifications (application, e-mail, SMS), support | Phase 6 |
 | Mode hors ligne | Non commencé (l’application est installable sur l’écran d’accueil mais nécessite Internet) |
