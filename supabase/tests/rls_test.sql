@@ -17,15 +17,15 @@ insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) value
   ('00000000-0000-0000-0000-0000000000ee', 'u@test.bj', null, '{}');
 
 create schema tests;
-grant usage on schema tests to authenticated, anon;
+grant usage on schema tests to authenticated, anon, service_role;
 create table tests.ids (k text primary key, v text);
-grant all on tests.ids to authenticated, anon;
+grant all on tests.ids to authenticated, anon, service_role;
 create function tests.login(p uuid) returns void language plpgsql as $$
 begin
   perform set_config('request.jwt.claims', json_build_object('sub', p, 'role', 'authenticated')::text, false);
 end $$;
 create function tests.id(p text) returns text language sql as $$ select v from tests.ids where k = p $$;
-grant execute on all functions in schema tests to authenticated, anon;
+grant execute on all functions in schema tests to authenticated, anon, service_role;
 
 -- Vérifie qu'une instruction échoue avec un message attendu.
 create function tests.fails(p_sql text, p_pattern text, p_msg text) returns void language plpgsql as $$
@@ -53,7 +53,7 @@ begin
   if not coalesce(p, false) then raise exception 'ÉCHEC : %', p_msg; end if;
   raise notice 'ok — %', p_msg;
 end $$;
-grant execute on all functions in schema tests to authenticated, anon;
+grant execute on all functions in schema tests to authenticated, anon, service_role;
 set client_min_messages = notice;
 
 select tests.check((select count(*) from public.profiles) = 5, 'profils créés à l''inscription');
@@ -230,6 +230,80 @@ select public.admin_handle_request(tests.id('req')::uuid, true, 'Mobile Money re
 select tests.check((select plan_id = 'entreprise' and plan_status = 'actif' and plan_ends_at > now() + interval '11 months' from public.organizations where id = tests.id('org2')::uuid), 'offre activée pour un an après traitement');
 select tests.check((select count(*) from public.activity_log where org_id = tests.id('org2')::uuid and entity = 'abonnement') >= 2, 'l''administration voit les opérations d''abonnement');
 select tests.check((select count(*) from public.activity_log where org_id = tests.id('org2')::uuid and entity = 'contacts') = 0, 'l''administration ne voit pas le journal métier des entreprises');
+
+-- ------------------------------------------------------------ plans et rendus IA
+select tests.login('00000000-0000-0000-0000-00000000000b');
+with x as (insert into public.plans (org_id, name, level, data) values (tests.id('org2')::uuid, 'Villa R+1', 'RDC', '{"v":1}') returning id)
+insert into tests.ids select 'plan', id from x;
+select tests.check((select reference from public.plans where id = tests.id('plan')::uuid) like 'PLN-____-0001', 'plan numéroté automatiquement');
+select tests.fails(format('insert into public.plans (org_id, name, source_path) values (%L, ''Intrus'', %L)', tests.id('org2'), tests.id('org1') || '/plans-techniques/x.pdf'), 'check constraint', 'un plan ne pointe pas vers les fichiers d''une autre entreprise');
+select tests.login('00000000-0000-0000-0000-00000000000a');
+select tests.check((select count(*) from public.plans) = 0, 'isolation : A ne voit pas les plans de B');
+select tests.fails(format('insert into public.plans (org_id, name) values (%L, ''Plan RDC'')', tests.id('org1')), 'row-level security', 'module Plans absent de l''offre Découverte');
+select tests.fails(format('select * from public.request_plan_render(%L, ''rendu_fidele'', ''moderne'')', tests.id('plan')), 'introuvable', 'A ne peut pas demander de rendu sur le plan de B');
+select tests.fails(format('insert into storage.objects (bucket_id, name) values (''documents'', %L)', tests.id('org1') || '/plans-techniques/p/source.pdf'), 'row-level security', 'fichiers de plans soumis au module Plans');
+
+select tests.login('00000000-0000-0000-0000-00000000000b');
+update public.plans set status = 'approuve' where id = tests.id('plan')::uuid;
+select tests.fails(format('update public.plans set data = ''{"v":1,"walls":[]}'' where id = %L', tests.id('plan')), 'approuvé', 'dessin approuvé non modifiable');
+update public.plans set status = 'travail' where id = tests.id('plan')::uuid;
+select tests.fails(format('update public.plans set reference = ''X'' where id = %L', tests.id('plan')), 'permission denied', 'référence de plan non modifiable');
+select tests.fails(format('select * from public.request_plan_render(%L, ''plan_importe'', ''moderne'')', tests.id('plan')), 'pas de fichier importé', 'rendu depuis le fichier importé : fichier requis');
+
+insert into tests.ids select 'r1', render_id from public.request_plan_render(tests.id('plan')::uuid, 'rendu_fidele', 'moderne', '{"width":1536}');
+select tests.check((select used = 10 and remaining = quota - 10 from public.ai_quota_status(tests.id('org2')::uuid)), 'unités IA réservées à la demande');
+select tests.check((select status = 'en_attente' and input_path like tests.id('org2') || '/plans-techniques/%/ia/%' from public.plan_renders where id = tests.id('r1')::uuid), 'demande de rendu enregistrée en attente');
+select tests.fails(format('insert into public.plan_renders (org_id, plan_id, source, input_path) values (%L, %L, ''rendu_fidele'', %L)', tests.id('org2'), tests.id('plan'), tests.id('org2') || '/plans-techniques/x/ia/y.png'), 'permission denied', 'le client ne crée pas de rendu sans passer par le quota');
+select tests.fails(format('update public.plan_renders set status = ''termine'' where id = %L', tests.id('r1')), 'permission denied', 'le client ne déclare pas un rendu terminé');
+select tests.fails(format('select public.finish_plan_render(%L, true, null, null, null, null)', tests.id('r1')), 'permission denied', 'seul le serveur clôt un rendu');
+select tests.fails('insert into public.ai_usage (org_id, feature, units) values (tests.id(''org2'')::uuid, ''x'', 1)', 'permission denied', 'le client n''écrit pas sa consommation IA');
+insert into storage.objects (bucket_id, name, metadata) values ('documents', (select input_path from public.plan_renders where id = tests.id('r1')::uuid), '{"size": 2000}');
+select tests.fails(format('insert into storage.objects (bucket_id, name) values (''documents'', %L)', tests.id('org2') || '/plans-techniques/x/ia/autre.png'), 'row-level security', 'aucun dépôt IA hors d''une demande en attente');
+
+reset role; set role service_role;
+select public.finish_plan_render(tests.id('r1')::uuid, true, tests.id('org2') || '/plans-techniques/p/ia/r1.png', 'openai', 'gpt-image-1', null);
+reset role; set role authenticated;
+select tests.login('00000000-0000-0000-0000-00000000000b');
+select tests.check((select status = 'termine' and finished_at is not null from public.plan_renders where id = tests.id('r1')::uuid), 'rendu terminé par le serveur');
+select tests.check((select status from public.ai_usage where ref_id = tests.id('r1')::uuid) = 'consomme', 'unités consommées au succès');
+insert into tests.ids select 'r2', render_id from public.request_plan_render(tests.id('plan')::uuid, 'rendu_fidele', 'luxe');
+reset role; set role service_role;
+select public.finish_plan_render(tests.id('r2')::uuid, false, null, 'openai', 'gpt-image-1', 'Fournisseur indisponible');
+reset role; set role authenticated;
+select tests.login('00000000-0000-0000-0000-00000000000b');
+select tests.check((select status from public.ai_usage where ref_id = tests.id('r2')::uuid) = 'rembourse', 'unités restituées en cas d''échec');
+select tests.check((select used from public.ai_quota_status(tests.id('org2')::uuid)) = 10, 'un échec ne compte pas dans le quota');
+
+reset role;
+update public.subscription_plans set ai_quota_month = 25 where id = 'entreprise';
+set role authenticated;
+select tests.login('00000000-0000-0000-0000-00000000000b');
+insert into tests.ids select 'r3', render_id from public.request_plan_render(tests.id('plan')::uuid, 'rendu_fidele', 'epure');
+select tests.fails(format('select * from public.request_plan_render(%L, ''rendu_fidele'', ''moderne'')', tests.id('plan')), 'Quota IA du mois atteint', 'quota IA mensuel appliqué');
+reset role;
+update public.subscription_plans set ai_quota_month = 1500 where id = 'entreprise';
+set role authenticated;
+select tests.login('00000000-0000-0000-0000-00000000000b');
+select public.request_plan_render(tests.id('plan')::uuid, 'rendu_fidele', 'moderne');
+select public.request_plan_render(tests.id('plan')::uuid, 'rendu_fidele', 'moderne');
+select tests.fails(format('select * from public.request_plan_render(%L, ''rendu_fidele'', ''moderne'')', tests.id('plan')), 'déjà en cours', 'au plus trois rendus IA simultanés');
+select tests.login('00000000-0000-0000-0000-00000000000a');
+select tests.fails(format('select public.cancel_plan_render(%L)', tests.id('r3')), 'introuvable', 'on n''annule que ses propres demandes');
+select tests.login('00000000-0000-0000-0000-00000000000b');
+reset role;
+update public.plan_renders set created_at = now() - interval '1 hour' where status = 'en_attente';
+set role authenticated;
+select tests.login('00000000-0000-0000-0000-00000000000b');
+select public.request_plan_render(tests.id('plan')::uuid, 'rendu_fidele', 'moderne');
+select tests.check((select status = 'echec' and error like '%restituées%' from public.plan_renders where id = tests.id('r3')::uuid), 'demande abandonnée close après délai');
+select tests.check((select status from public.ai_usage where ref_id = tests.id('r3')::uuid) = 'rembourse', 'unités d''une demande abandonnée restituées');
+insert into tests.ids select 'r4', render_id from public.request_plan_render(tests.id('plan')::uuid, 'rendu_fidele', 'moderne');
+select public.cancel_plan_render(tests.id('r4')::uuid, 'Service injoignable.');
+select tests.check((select status = 'echec' from public.plan_renders where id = tests.id('r4')::uuid) and (select status from public.ai_usage where ref_id = tests.id('r4')::uuid) = 'rembourse', 'demande annulée par son auteur : unités restituées');
+select tests.check((select count(*) from public.activity_log where entity = 'plans' and action = 'demande de rendu IA') >= 3, 'demandes de rendu IA tracées au journal');
+select tests.login('00000000-0000-0000-0000-00000000000a');
+select tests.check((select units_month from public.admin_ai_overview()) = 10, 'consommation IA visible par la plateforme');
+select tests.check((select count(*) from public.plan_renders) = 0, 'l''administration ne voit pas les rendus des entreprises');
 
 -- ------------------------------------------------------------ double authentification
 reset role;

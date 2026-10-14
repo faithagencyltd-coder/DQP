@@ -33,6 +33,21 @@ const confirm = (email) => fetch(`${API}/__dev/confirm?email=${encodeURIComponen
 const nav = (page, label) => page.locator('aside').getByRole('link', { name: label }).first().click();
 const field = (page, label) => page.getByLabel(label, { exact: true });
 
+// Coordonnées écran d'un point du plan (mètres), d'après le cadrage courant de la zone de dessin.
+async function toScreen(page, [x, y]) {
+  const svg = page.getByRole('img', { name: 'Zone de dessin du plan' });
+  const box = await svg.boundingBox();
+  const vb = (await svg.getAttribute('viewBox')).split(' ').map(Number);
+  const k = box.width / vb[2];
+  return [box.x + (x - vb[0]) * k, box.y + (y - vb[1]) * k];
+}
+async function clickAt(page, pt) {
+  const [sx, sy] = await toScreen(page, pt);
+  await page.mouse.move(sx, sy);
+  await page.mouse.click(sx, sy);
+}
+const tool = (page, name) => page.getByRole('toolbar', { name: 'Outils de dessin' }).getByRole('button', { name, exact: true }).click();
+
 async function signup(page, u) {
   await page.goto(BASE + '#/inscription');
   await page.getByLabel('Prénom').fill(u.first);
@@ -250,7 +265,7 @@ try {
 
   // ------------------------------------------------------------ abonnement et administration
   await nav(page, 'Abonnement');
-  await page.getByRole('button', { name: 'Choisir', exact: true }).first().click();
+  await page.locator('div.rounded-xl', { hasText: 'Professionnelle' }).getByRole('button', { name: 'Choisir', exact: true }).click();
   await page.getByRole('button', { name: 'Envoyer la demande', exact: true }).click();
   await page.getByText('En attente').first().waitFor();
   await shot(page, '13-abonnement');
@@ -275,6 +290,115 @@ try {
   await page.reload();
   await page.getByText('Actif').first().waitFor();
   ok('l’entreprise voit son offre active');
+
+  // ------------------------------------------------------------ plans : dessin, pièces, rendus
+  await nav(page, 'Plans techniques');
+  await page.getByRole('button', { name: 'Nouveau plan', exact: true }).click();
+  await page.getByLabel('Nom du plan').fill('Villa Awa — vue en plan');
+  await page.getByRole('button', { name: 'Créer', exact: true }).click();
+  await page.getByRole('img', { name: 'Zone de dessin du plan' }).waitFor();
+  const planUrl = page.url();
+  await tool(page, 'Mur');
+  for (const pt of [[0, 0], [9, 0], [9, 7], [0, 7], [0, 0]]) await clickAt(page, pt);
+  await page.getByRole('toolbar', { name: 'Outils de dessin' }).locator('..').getByLabel('Type', { exact: true }).selectOption('cloison');
+  await clickAt(page, [4, 0]);
+  const [mx, my] = await toScreen(page, [4, 5]);
+  await page.mouse.move(mx, my);
+  await page.getByLabel('Longueur saisie').fill('7');
+  await page.getByLabel('Longueur saisie').press('Enter');
+  await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  await page.getByText('5 mur(s)').waitFor();
+  ok('plan dessiné : 4 murs et une cloison (longueur saisie au clavier : 7 m)');
+
+  await tool(page, 'Porte / fenêtre');
+  await clickAt(page, [4, 3.5]);
+  await page.getByText('Porte', { exact: true }).first().waitFor();
+  await tool(page, 'Porte / fenêtre');
+  await page.getByLabel('Ouverture', { exact: true }).selectOption('fenetre');
+  await clickAt(page, [2, 0]);
+  await tool(page, 'Pièce (clic)');
+  await page.getByLabel('Type de pièce').selectOption('sejour');
+  await clickAt(page, [2, 3.5]);
+  await page.getByText('26,18 m²').first().waitFor();
+  await page.getByLabel('Type de pièce').selectOption('chambre');
+  await clickAt(page, [6.5, 3.5]);
+  await page.getByText('32,98 m²').first().waitFor();
+  ok('pièces détectées d’un clic entre les murs : séjour 3,85 × 6,80 = 26,18 m², chambre 4,85 × 6,80 = 32,98 m²');
+  await page.getByRole('button', { name: 'Proposer un aménagement', exact: true }).click();
+  await page.getByText(/élément\(s\) proposé\(s\)/).waitFor();
+  ok('aménagement proposé dans la chambre (lit, chevets, armoire), déplaçable');
+
+  await page.getByRole('tab', { name: 'Rendu', exact: true }).click();
+  await page.getByRole('button', { name: 'Agrandir l’aperçu du rendu' }).click();
+  await page.getByRole('img', { name: 'Rendu de présentation', exact: true }).waitFor();
+  await shot(page, '17-plan-rendu');
+  await page.keyboard.press('Escape');
+  const [pdfDl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'PDF', exact: true }).click()]);
+  const planPdf = readFileSync(await pdfDl.path());
+  const [dxfDl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'DXF', exact: true }).click()]);
+  const dxf = readFileSync(await dxfDl.path(), 'utf8');
+  if (!planPdf.subarray(0, 4).toString().startsWith('%PDF') || !dxf.includes('AC1009')) throw new Error('exports du plan invalides');
+  ok(`rendu de présentation : PDF à l’échelle (${Math.round(planPdf.length / 1024)} Ko) et DXF exportés`);
+
+  await page.getByRole('tab', { name: 'Rendu IA', exact: true }).click();
+  await page.getByText('300 / 300 unités').waitFor();
+  await page.getByRole('button', { name: /Générer le rendu IA/ }).click();
+  await page.getByText('Terminé', { exact: true }).first().waitFor({ timeout: 60000 });
+  await page.getByText('290 / 300 unités').waitFor();
+  await page.getByRole('button', { name: 'Voir', exact: true }).first().click();
+  await page.getByRole('img', { name: /illustration non contractuelle/ }).waitFor();
+  await shot(page, '18-plan-rendu-ia');
+  await page.keyboard.press('Escape');
+  ok('rendu IA : quota réservé puis consommé (10 unités), image marquée « non contractuelle » (fournisseur de test local)');
+
+  await page.getByRole('button', { name: 'Plus', exact: true }).click();
+  await page.getByText('Créer un métré depuis ce plan').click();
+  await page.waitForURL(/#\/app\/metres\//);
+  await page.getByText('Revêtement de sol').first().waitFor();
+  ok('métré créé depuis le plan (sols, plinthes, murs ; hauteur des murs « à compléter »)');
+
+  // Import d'un plan scanné (image), calibration, détection d'une pièce sur les traits du fichier.
+  const pngPath = `${OUT}/plan-scanne.png`;
+  const dataUrl = await page.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 1000; c.height = 700;
+    const x = c.getContext('2d');
+    x.fillStyle = '#fff'; x.fillRect(0, 0, 1000, 700);
+    x.strokeStyle = '#000'; x.lineWidth = 12; x.strokeRect(50, 50, 900, 600);
+    x.lineWidth = 8; x.beginPath(); x.moveTo(450, 50); x.lineTo(450, 650); x.stroke();
+    return c.toDataURL('image/png');
+  });
+  (await import('node:fs')).writeFileSync(pngPath, Buffer.from(dataUrl.split(',')[1], 'base64'));
+  await nav(page, 'Plans techniques');
+  await page.getByRole('button', { name: 'Nouveau plan', exact: true }).click();
+  await page.getByLabel('Nom du plan').fill('Plan client scanné');
+  await page.getByLabel('Fichier du plan').setInputFiles(pngPath);
+  await page.getByRole('button', { name: 'Créer', exact: true }).click();
+  await page.getByText('Échelle non vérifiée').first().waitFor();
+  await page.waitForTimeout(800);
+  ok('plan importé (image) : échelle provisoire signalée « non vérifiée », mesures indicatives (≈)');
+  await tool(page, 'Échelle');
+  await clickAt(page, [0.5, 0.5]);
+  await clickAt(page, [9.5, 0.5]);
+  await page.getByLabel('Distance réelle (lue sur une cote du plan)').fill('18');
+  await page.getByRole('button', { name: 'Appliquer', exact: true }).click();
+  await page.getByText(/Échelle vérifiée/).first().waitFor();
+  await page.waitForTimeout(500);
+  await tool(page, 'Pièce (clic)');
+  await page.getByLabel('Type de pièce').selectOption('salon');
+  await clickAt(page, [5, 7]);
+  await page.getByText(/^9[01],\d\d m²$/).first().waitFor();
+  await shot(page, '19-plan-import-calibre');
+  ok('calibration sur une cote connue (9 m provisoires → 18 m) puis pièce détectée sur les traits du scan (7,80 × 11,76 = 91,73 m² attendus, à un pixel près)');
+
+  const phone = await newPage(390, 844);
+  await login(phone, owner);
+  await phone.waitForURL(/#\/app/);
+  await phone.goto(planUrl);
+  await phone.getByRole('img', { name: 'Zone de dessin du plan' }).waitFor();
+  await phone.waitForTimeout(600);
+  await shot(phone, '20-plan-mobile');
+  ok('éditeur de plan utilisable sur téléphone (390 px)');
 
   // ------------------------------------------------------------ tableau de bord rempli
   await nav(page, 'Tableau de bord');

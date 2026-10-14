@@ -75,3 +75,22 @@ export interface Quote {
 export interface QuoteVersion { id: string; quote_id: string; version: number; title: string; status: string; body: DocBody; settings: QuoteSettings; total_ht: number | null; total_ttc: number | null; reason: string | null; created_at: string }
 
 export interface ActivityRow { id: number; org_id: string; project_id: string | null; user_id: string | null; action: string; entity: string; entity_id: string | null; label: string | null; detail: Record<string, unknown> | null; at: string }
+
+export interface PlanDoc {
+  id: string; org_id: string; project_id: string | null; reference: string; name: string; level: string;
+  plan_type: 'architecture' | 'structure' | 'electricite' | 'plomberie' | 'vrd' | 'amenagement' | 'autre';
+  version: number; status: 'travail' | 'verifie' | 'approuve';
+  source_path: string | null; source_name: string | null; source_mime: string | null; source_page: number;
+  data: unknown; scale_verified: boolean; comment: string | null; archived_at: string | null;
+  created_by: string | null; updated_by: string | null; created_at: string; updated_at: string;
+}
+
+export interface PlanRender {
+  id: string; org_id: string; plan_id: string; source: 'rendu_fidele' | 'plan_importe'; style: 'moderne' | 'chaleureux' | 'luxe' | 'epure';
+  status: 'en_attente' | 'en_cours' | 'termine' | 'echec'; input_path: string; storage_path: string | null;
+  frame: { x0: number; y0: number; pxPerM: number; width: number; height: number } | null;
+  plan_version: string | null; provider: string | null; model: string | null; error: string | null; units: number;
+  created_by: string | null; created_at: string; started_at: string | null; finished_at: string | null;
+}
+
+export interface AiQuota { quota: number; used: number; remaining: number; period_start: string }

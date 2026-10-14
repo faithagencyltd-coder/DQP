@@ -22,7 +22,7 @@ export const NAV: NavItem[] = [
   { path: '/app', label: 'Tableau de bord', icon: LayoutDashboard, group: 'pilotage' },
   { path: '/app/clients', label: 'Clients et fournisseurs', icon: Users, module: 'clients', group: 'pilotage' },
   { path: '/app/projets', label: 'Projets et chantiers', icon: Briefcase, module: 'projets', group: 'pilotage' },
-  { path: '/app/plans', label: 'Plans techniques', icon: Map, module: 'plans', group: 'etudes', soon: 'Phase 3' },
+  { path: '/app/plans', label: 'Plans techniques', icon: Map, module: 'plans', group: 'etudes' },
   { path: '/app/metres', label: 'Métrés et quantitatifs', icon: Calculator, module: 'metres', group: 'etudes' },
   { path: '/app/prix', label: 'Bibliothèque de prix', icon: Library, module: 'prix', group: 'etudes' },
   { path: '/app/dqe', label: 'DQE et BPU', icon: FileSpreadsheet, module: 'dqe', group: 'etudes' },

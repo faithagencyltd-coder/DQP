@@ -254,7 +254,7 @@ export function buildMetrePdf(m: MetreDoc, ctx: PdfContext): jsPDF {
 }
 
 // ------------------------------------------------------------------ dans le navigateur
-async function loadLogo(org: Organization): Promise<PdfContext['logo']> {
+export async function loadLogo(org: Organization): Promise<PdfContext['logo']> {
   if (!org.logo_path) return null;
   try {
     const { supabase } = await import('../lib/supabase');

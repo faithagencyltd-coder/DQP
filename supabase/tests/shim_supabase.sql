@@ -30,11 +30,12 @@ create table auth.mfa_factors (
   factor_type text default 'totp',
   status text default 'unverified'
 );
+-- Comme Supabase : un réglage vide (fin de transaction) vaut « pas de session ».
 create function auth.uid() returns uuid language sql stable as $$
-  select nullif(current_setting('request.jwt.claims', true)::json ->> 'sub', '')::uuid
+  select nullif(nullif(current_setting('request.jwt.claims', true), '')::json ->> 'sub', '')::uuid
 $$;
 create function auth.jwt() returns jsonb language sql stable as $$
-  select coalesce(current_setting('request.jwt.claims', true), '{}')::jsonb
+  select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb
 $$;
 
 create schema storage;

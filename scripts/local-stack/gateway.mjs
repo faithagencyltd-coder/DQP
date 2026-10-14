@@ -2,12 +2,14 @@
 //   /rest/v1    → PostgREST (vraie base, vraies migrations, vraies règles RLS)
 //   /auth/v1    → authentification simplifiée (inscription, confirmation, connexion, jetons)
 //   /storage/v1 → stockage de fichiers (les droits sont vérifiés par la base, en RLS)
+//   /functions/v1/rendu-ia → même cœur que la fonction serveur Supabase (supabase/functions/rendu-ia)
 // Réservé aux tests : jamais déployé. La production utilise Supabase.
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import pg from 'pg';
+import { handleRenduIa, providerFromEnv } from '../../supabase/functions/rendu-ia/core.ts';
 
 const PORT = Number(process.env.GATEWAY_PORT ?? 54320);
 const REST = process.env.POSTGREST_URL ?? 'http://127.0.0.1:54331';
@@ -219,6 +221,32 @@ async function storage(req, res, url) {
   return err(404, `Route de stockage inconnue : ${route}`);
 }
 
+// Rendu IA : le cœur est celui de la fonction serveur ; seul l'accès aux données change.
+// Fournisseur : celui des variables IA_IMAGE_* si une clé est fournie ; sinon, uniquement si
+// PLANORA_TEST_AI=1, un fournisseur de TEST qui renvoie l'image d'entrée telle quelle
+// (permet de vérifier tout le parcours sans service payant ; jamais disponible en production).
+const testProvider = process.env.PLANORA_TEST_AI === '1'
+  ? { name: 'test-local', model: 'copie-de-l-entree', generate: async (input) => input }
+  : null;
+async function renduIa(req, res) {
+  const body = json(await readBody(req));
+  const reply = await handleRenduIa(req.headers.authorization ?? null, body, {
+    userFromToken: async (t) => { const c = verify(t); return c?.sub ? { id: c.sub } : null; },
+    getRender: async (id) => (await pool.query('select id, org_id, plan_id, source, style, status, input_path, created_by from public.plan_renders where id = $1', [id])).rows[0] ?? null,
+    markStarted: async (id) => (await pool.query(`update public.plan_renders set status = 'en_cours', started_at = now() where id = $1 and status = 'en_attente'`, [id])).rowCount === 1,
+    finish: async (id, ok, p, provider, model, error) => { await pool.query('select public.finish_plan_render($1, $2, $3, $4, $5, $6)', [id, ok, p, provider, model, error]); },
+    download: async (name) => new Uint8Array(fs.readFileSync(path.join(FILES, 'documents', name))),
+    upload: async (name, bytes, mime) => {
+      await pool.query('insert into storage.objects (bucket_id, name, metadata) values ($1, $2, $3)', ['documents', name, { size: bytes.length, mimetype: mime }]);
+      const file = path.join(FILES, 'documents', name);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, bytes);
+    },
+    provider: providerFromEnv((k) => process.env[k]) ?? testProvider,
+  });
+  return send(res, reply.status, reply.body);
+}
+
 async function proxyRest(req, res, url) {
   const target = REST + url.pathname.replace('/rest/v1', '') + url.search;
   const body = ['GET', 'HEAD'].includes(req.method) ? undefined : await readBody(req);
@@ -245,6 +273,7 @@ http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/rest/v1')) return await proxyRest(req, res, url);
     if (url.pathname.startsWith('/auth/v1')) return await auth(req, res, url);
     if (url.pathname.startsWith('/storage/v1')) return await storage(req, res, url);
+    if (url.pathname === '/functions/v1/rendu-ia' && req.method === 'POST') return await renduIa(req, res);
     if (url.pathname === '/__dev/confirm') {
       await pool.query('update auth.users set email_confirmed_at = now() where lower(email) = lower($1)', [url.searchParams.get('email')]);
       return send(res, 200, { ok: true });

@@ -1,7 +1,7 @@
 {
   "name": "planora-btp",
   "productName": "PLANORA BTP",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "PLANORA BTP — plateforme SaaS de métrés, DQE/BPU, devis et gestion de chantiers",
   "author": "Faith Agency",
   "private": true,

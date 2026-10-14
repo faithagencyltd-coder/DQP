@@ -22,18 +22,24 @@ export function AdminPage() {
     if (error) throw error;
     return data[0] as { accounts: number; organizations: number; active_subscriptions: number; expired: number; trials: number; storage_mb: number };
   } });
+  const ai = useQuery({ queryKey: ['admin-ai'], enabled: isPlatformAdmin, queryFn: async () => {
+    const { data, error } = await supabase.rpc('admin_ai_overview');
+    if (error) throw error;
+    return data[0] as { units_month: number; renders_ok: number; renders_failed: number };
+  } });
   if (!session || adminLoading) return <Spinner />;
   if (!isPlatformAdmin) return <Navigate to="/app" replace />;
   const o = overview.data;
   return (
     <>
       <PageHeader title="Administration PLANORA BTP" subtitle="Réservé à l’équipe de la plateforme. Le contenu des entreprises n’est pas accessible depuis cet espace." />
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-6">
         <Stat label="Comptes" value={o?.accounts ?? '…'} />
         <Stat label="Entreprises" value={o?.organizations ?? '…'} />
         <Stat label="Abonnements actifs" value={o?.active_subscriptions ?? '…'} tone="ok" />
         <Stat label="Essais en cours" value={o?.trials ?? '…'} tone="warn" />
         <Stat label="Stockage utilisé" value={o ? `${String(o.storage_mb).replace('.', ',')} Mo` : '…'} hint={o ? `${o.expired} abonnement(s) échu(s)` : undefined} />
+        <Stat label="Consommation IA du mois" value={ai.data ? `${ai.data.units_month} unités` : '…'} hint={ai.data ? `${ai.data.renders_ok} rendu(s) réussi(s), ${ai.data.renders_failed} échec(s)` : undefined} />
       </div>
       <Tabs value={tab} onChange={setTab} items={[{ id: 'entreprises', label: 'Entreprises' }, { id: 'demandes', label: 'Demandes d’abonnement' }, { id: 'offres', label: 'Offres' }]} />
       {tab === 'entreprises' && <Orgs />}

@@ -20,6 +20,22 @@
 5. Authentication → Providers → Email : confirmation d’e-mail activée ; longueur minimale du mot de passe 8.
 6. Pour la production : configurer un service SMTP (le service intégré est limité à quelques courriels par heure).
 
+## 1 bis. Activer le rendu IA des plans (facultatif)
+
+Sans cette étape, tout fonctionne sauf le bouton « Générer le rendu IA », qui répond clairement que le
+service n’est pas activé (et restitue les unités).
+
+1. Ouvrir un compte chez un fournisseur d’images : **OpenAI** (modèle `gpt-image-1`) ou **Google Gemini**
+   (modèle `gemini-2.5-flash-image`), et créer une clé d’API. Fixer un plafond de dépenses chez le fournisseur.
+2. Déployer la fonction serveur : `supabase functions deploy rendu-ia` (dossier `supabase/functions/rendu-ia`).
+3. Dans Supabase → Edge Functions → Secrets :
+   - `IA_IMAGE_PROVIDER` = `openai` ou `gemini`
+   - `IA_IMAGE_API_KEY` = la clé (elle ne quitte jamais le serveur)
+   - `IA_IMAGE_MODEL` = facultatif (pour changer de modèle)
+4. Ajuster les quotas des offres dans Administration → Offres (un rendu = 10 unités).
+
+Coûts, limites et confidentialité : voir `docs/RENDU_PLANS.md`.
+
 ## 2. Publier l’application
 
 Dans le dépôt GitHub : Settings → Secrets and variables → Actions → **Variables** :
@@ -48,4 +64,5 @@ npm test && npm run typecheck
 ## Coûts récurrents estimés (démarrage)
 
 Supabase gratuit puis Pro (≈ 25 $/mois), nom de domaine (≈ 15 $/an), service de courriel (gratuit jusqu’à quelques
-milliers de courriels/mois chez la plupart des fournisseurs). Services IA et paiement : à chiffrer lors des phases 4 et 6.
+milliers de courriels/mois chez la plupart des fournisseurs). Rendu IA des plans : facturé par image par le
+fournisseur choisi (voir `docs/RENDU_PLANS.md`). Assistant IA et paiement : à chiffrer lors des phases 4 et 6.

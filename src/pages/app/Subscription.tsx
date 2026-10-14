@@ -52,7 +52,7 @@ export function SubscriptionPage() {
               <Usage label="Projets actifs" used={usage.data.projects} max={plan.max_projects} />
               <Usage label="Documents" used={usage.data.documents} max={plan.max_documents} />
               <Usage label="Stockage" used={usage.data.storage_bytes} max={plan.max_storage_mb * 1048576} fmt={fmtSize} />
-              <p className="text-[12px] text-muted">Quota IA : {plan.ai_quota_month ? `${plan.ai_quota_month} requêtes / mois` : 'non inclus'} (l’assistant IA arrive en phase 4).</p>
+              <p className="text-[12px] text-muted">Quota IA : {plan.ai_quota_month ? `${plan.ai_quota_month} unités / mois (un rendu IA de plan = 10 unités ; l’assistant IA arrive en phase 4)` : 'non inclus dans cette offre'}.</p>
             </div>
           ) : <p className="text-muted">Indisponible.</p>}
         </Card>
@@ -72,6 +72,7 @@ export function SubscriptionPage() {
               <li>{p.max_users ? `${p.max_users} utilisateur(s)` : 'Utilisateurs illimités'}</li>
               <li>{p.max_projects ? `${p.max_projects} projets actifs` : 'Projets illimités'}</li>
               <li>{p.max_storage_mb >= 1000 ? `${p.max_storage_mb / 1000} Go` : `${p.max_storage_mb} Mo`} de stockage</li>
+              <li>{p.ai_quota_month ? `Quota IA : ${p.ai_quota_month} unités / mois` : 'Pas de quota IA'}</li>
               {(['factures', 'achats', 'plans', 'planning'] as Module[]).map((m) => <li key={m} className="flex items-center gap-1">{p.modules.includes(m) ? <Check size={13} className="text-ok-600" /> : <X size={13} className="text-faint" />}{MODULE_LABEL[m]}</li>)}
             </ul>
             {p.price_month > 0 && <Allowed module="abonnement" action="modifier"><Button className="mt-3" variant={p.id === plan.id ? 'secondary' : 'primary'} disabled={!!pending} onClick={() => setChoice(p)}>{p.id === plan.id ? 'Renouveler' : 'Choisir'}</Button></Allowed>}

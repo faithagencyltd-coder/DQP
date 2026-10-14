@@ -27,6 +27,8 @@ const QuoteEditor = lazy(() => import('./pages/app/QuoteEditor').then((m) => ({ 
 const SettingsPage = lazy(() => import('./pages/app/Settings').then((m) => ({ default: m.SettingsPage })));
 const SubscriptionPage = lazy(() => import('./pages/app/Subscription').then((m) => ({ default: m.SubscriptionPage })));
 const JournalPage = lazy(() => import('./pages/app/Journal').then((m) => ({ default: m.JournalPage })));
+const PlansPage = lazy(() => import('./pages/app/Plans').then((m) => ({ default: m.PlansPage })));
+const PlanEditor = lazy(() => import('./pages/app/plan/PlanEditor').then((m) => ({ default: m.PlanEditor })));
 const AdminPage = lazy(() => import('./pages/app/Admin').then((m) => ({ default: m.AdminPage })));
 
 function NotConfigured() {
@@ -88,7 +90,8 @@ export function App() {
         <Route path="abonnement" element={page(<SubscriptionPage />)} />
         <Route path="journal" element={page(<JournalPage />)} />
         <Route path="admin" element={<Suspense fallback={<Spinner />}><AdminPage /></Suspense>} />
-        <Route path="plans" element={page(<ComingSoon module="plans" />)} />
+        <Route path="plans" element={page(<PlansPage />)} />
+        <Route path="plans/:id" element={page(<PlanEditor />)} />
         <Route path="achats" element={page(<ComingSoon module="achats" />)} />
         <Route path="stocks" element={page(<ComingSoon module="stocks" />)} />
         <Route path="factures" element={page(<ComingSoon module="factures" />)} />

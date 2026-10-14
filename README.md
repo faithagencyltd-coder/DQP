@@ -18,7 +18,14 @@ clients et fournisseurs, projets et lots, bibliothèque de prix avec déboursé 
 devis avec versions verrouillées, exports PDF et Excel, gestion documentaire, équipe et matrice de permissions,
 double authentification, abonnements et administration de la plateforme.
 
-Les modules des phases suivantes (plans techniques, IA, facturation, achats, stocks, planning) apparaissent
+## Version 0.2.0 — plans 2D et rendus de présentation
+
+Import d’un plan (PDF, image), calibration, éditeur 2D (murs, portes, fenêtres, pièces détectées d’un clic,
+mobilier, cotes), **rendu fidèle** élégant (4 styles, textures, ombres, noms, surfaces, cotes exactes ; PNG,
+PDF à l’échelle, DXF), métré tiré du plan, et **rendu par IA** en option (quota mensuel, noms et cotes exacts
+posés par PLANORA, mention « illustration non contractuelle »). Détails : [`docs/RENDU_PLANS.md`](docs/RENDU_PLANS.md).
+
+Les modules des phases suivantes (assistant IA, facturation, achats, stocks, planning) apparaissent
 dans le menu avec la mention « bientôt » et ne sont pas simulés.
 
 ## Règles appliquées dans le code
@@ -37,7 +44,7 @@ dans le menu avec la mention « bientôt » et ne sont pas simulés.
 npm install
 cp .env.example .env.local     # adresse et clé publiable du projet Supabase
 npm run dev
-npm test && npm run typecheck  # moteur, PDF, Excel, import
+npm test && npm run typecheck  # moteur, PDF, Excel, import, plans, fonction rendu IA
 ```
 
 L’ancienne application de bureau DQP reste disponible dans la branche `dqp-desktop` (version 0.4.0).

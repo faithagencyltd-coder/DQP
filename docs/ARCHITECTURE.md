@@ -13,8 +13,13 @@ Le cahier des charges recommande React + TypeScript, un backend (FastAPI ou équ
 | Calculs | moteur TypeScript partagé `src/engine` | un seul moteur pour l’écran, le PDF et l’Excel (§30.2), testé |
 | Hébergement | GitHub Pages (application statique) | gratuit, HTTPS |
 
-Les traitements lourds à venir (OCR, IA, analyse de plans) seront exécutés dans des fonctions serveur
-(Supabase Edge Functions) ou un service dédié, avec un suivi d’état « en attente / en cours / terminé / échec ».
+Les traitements IA passent par des fonctions serveur (Supabase Edge Functions), seules détentrices des clés
+des fournisseurs, avec un suivi d’état « en attente / en cours / terminé / échec » lu dans la base.
+Première fonction : `supabase/functions/rendu-ia` (rendu de plans par IA). Son cœur (`core.ts`) n’a aucune
+dépendance : il tourne sous Deno (Supabase), sous Node (pile de test locale) et dans les tests.
+
+Le rendu fidèle des plans, la détection des pièces, l’aménagement proposé, les exports PNG / PDF / DXF
+sont calculés dans le navigateur par `src/engine/plan` (fonctions pures, testées) : aucun coût serveur.
 
 ## Sécurité : où sont appliquées les règles
 
@@ -40,17 +45,21 @@ Toutes dans la base (`supabase/migrations/`), jamais seulement dans l’interfac
 | `metres` | métrés (lignes et règles en JSON, détail recalculable) |
 | `quotes`, `quote_versions` | DQE, BPU, devis ; versions figées |
 | `billing_requests` | demandes d’abonnement |
+| `plans` | plans : fichier importé, dessin en mètres (JSON versionné), échelle vérifiée ou non, statut |
+| `plan_renders` | rendus IA : source, ambiance, état réel, cadre de l’image (pour la surcouche des cotes) |
+| `ai_usage` | grand livre des unités IA (réservées, consommées, restituées) ; quota par offre |
 | `activity_log`, `counters` | journal, numérotation |
 
 ## Arborescence
 
 ```
 src/engine/      moteur de calcul (métrés, DQE/BPU/devis, déboursé sec, arrondis, CSV, doublons, import Excel)
-src/engine/dqp/  analyseur de DQE Excel et de plans PDF repris de DQP (phase 3)
+src/engine/plan/ plans : modèle, calibration, détection des pièces, mobilier, rendu fidèle, métré, DXF
+src/engine/dqp/  analyseur de DQE Excel et de plans PDF repris de DQP (traits vectoriels pour l’accroche)
 src/docs/        génération PDF et Excel
 src/lib/         accès aux données, session, permissions, libellés
 src/ui/          composants d’interface
 src/pages/       écrans
-supabase/        migrations et tests de sécurité
+supabase/        migrations, tests de sécurité, fonction serveur rendu-ia
 scripts/         pile de test locale et recette de bout en bout
 ```

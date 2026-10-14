@@ -14,11 +14,12 @@ const AVAILABLE = [
   { icon: Library, title: 'Bibliothèque de prix', text: 'Prix par pays et par ville, date et source, historique, décomposition déboursé sec → prix de vente.' },
   { icon: FileSpreadsheet, title: 'DQE et BPU', text: 'Lots, sous-totaux, totaux recalculés ; BPU relié au DQE ; import de vos DQE Excel.' },
   { icon: FileText, title: 'Devis professionnels', text: 'Numérotation contrôlée, remise, taxes paramétrables, versions verrouillées, PDF à votre en-tête.' },
+  { icon: Map, title: 'Plans et rendus de présentation', text: 'Importez ou dessinez le plan, vérifiez l’échelle, obtenez un rendu élégant avec cotes et surfaces exactes ; rendu IA en option.' },
   { icon: Lock, title: 'Permissions et sécurité', text: 'Rôles configurables par entreprise, données isolées et vérifiées côté serveur.' },
 ];
 
 const SOON = [
-  ['Plans techniques', 'import PDF/images, calibration, mesures, éditeur 2D — phase 3'],
+  ['Plans : comparaison de versions, symboles techniques, DWG', 'suite de la phase 3'],
   ['Assistant IA PLANORA', 'lecture de documents, aide aux métrés — phase 4'],
   ['Facturation, dépenses, achats, stocks, planning', 'phase 5'],
   ['Paiement en ligne Mobile Money et carte', 'phase 6'],
