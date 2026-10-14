@@ -206,7 +206,7 @@ export function DocumentsPage() {
   const [upload, setUpload] = useState(false);
   return (
     <>
-      <PageHeader title="Documents et rapports" subtitle="Fichiers privés, classés par projet, lot, type et statut, avec historique des versions."
+      <PageHeader title="Documents" subtitle="Fichiers privés, classés par projet, lot, type et statut, avec historique des versions."
         actions={<Allowed module="documents" action="creer"><Button variant="primary" icon={<Upload size={16} />} onClick={() => setUpload(true)}>Déposer des documents</Button></Allowed>} />
       <DocumentsPanel />
       {upload && <UploadForm onClose={() => setUpload(false)} />}

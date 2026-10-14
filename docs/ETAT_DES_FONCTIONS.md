@@ -71,6 +71,15 @@ Détail du module, des coûts et des limites : `docs/RENDU_PLANS.md`.
 | Réserves : constat avec photos, localisation, intervenant, échéance, levée puis validation de la levée ; export CSV et PDF | ✅ Terminé | contrôles SQL, recette 42 |
 | Fiche chantier « Gestion de chantier » : avancement, retards, rapports, réserves, commandes et matériaux sortis du stock | ✅ Terminé | recette 43 |
 
+## Tableau de bord, historiques et rapports (§6, §7, §21)
+
+| Élément | État | Vérification |
+|---|---|---|
+| Tableau de bord : projets actifs, chantiers en cours, devis en attente et acceptés, budget prévisionnel, facturé, encaissé, reste à encaisser (dont échu), dépenses, coût réel, marges prévisionnelle et constatée, prochaines échéances, alertes de stock, tâches en retard ; limites des données affichées | ✅ Terminé | 3 tests moteur, recette 47 |
+| Graphiques : recettes et dépenses sur 12 mois, budget prévisionnel / dépenses réelles par chantier, état des devis, avancement des projets, coûts par lot | ✅ Terminé | recette 47 |
+| Fiche client : projets, devis, factures, paiements, solde et factures échues ; fiche fournisseur : articles fournis et tarifs, commandes, écarts de facturation, dépenses et justificatifs ; historique des modifications de la fiche | ✅ Terminé | recette 46 |
+| Rapports : chantier, financier, dépenses, avancement, achats, stocks, synthèse des devis, synthèse des factures, état des paiements, quantitatif par lot, comparatif budget prévisionnel / réel (DQE et BPU depuis leur module) ; période, projet, date de génération et limites ; PDF, Excel, CSV, impression | ✅ Terminé | 4 tests moteur, recette 44-45 |
+
 ## Autres fonctions livrées
 
 | Élément | État |
@@ -92,7 +101,6 @@ Détail du module, des coûts et des limites : `docs/RENDU_PLANS.md`.
 | Paiement des abonnements | Demande + activation manuelle par l’administration ; le paiement en ligne (Mobile Money, carte) attend le choix d’un prestataire. |
 | Permissions par projet | La matrice est par entreprise ; la restriction par projet viendra avec les équipes de chantier. |
 | Client externe | Rôle non encore ouvert (accès limité aux devis et rapports). |
-| Rapports | DQE, BPU, devis, métrés, factures, bons de commande, dépenses, stocks, planning, rapports journaliers et réserves s’exportent ; les rapports de synthèse (financier, avancement, achats) arrivent avec le tableau de bord complet. |
 
 ## Non réalisé (signalé « bientôt » dans l’application)
 

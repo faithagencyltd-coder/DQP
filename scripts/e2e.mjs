@@ -529,6 +529,51 @@ try {
   await shot(page, '29-fiche-chantier');
   ok('fiche chantier : avancement, rapports, réserves, commandes et matériaux sortis du stock');
 
+  // ------------------------------------------------------------ rapports, historiques, tableau de bord
+  await nav(page, 'Rapports');
+  await page.getByRole('option', { name: /Rapport financier/ }).click();
+  await page.getByRole('cell', { name: 'PRJ-2026-0001 · Villa R+1 Fidjrossè' }).waitFor();
+  await page.getByText('Limites des données').first().waitFor();
+  await shot(page, '30-rapport-financier');
+  for (const [label, ext, magic] of [['PDF', 'pdf', '%PDF'], ['Excel', 'xlsx', 'PK'], ['CSV', 'csv', '﻿']]) {
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: label, exact: true }).click()]);
+    const path = `${OUT}/rapport-financier.${ext}`;
+    await dl.saveAs(path);
+    if (!readFileSync(path).toString('utf8', 0, 4).startsWith(magic)) throw new Error(`Export ${label} du rapport invalide`);
+  }
+  ok('rapport financier par chantier (période, limites) exporté en PDF, Excel et CSV');
+  await page.getByRole('option', { name: /Rapport de chantier/ }).click();
+  await page.getByLabel('Projet (obligatoire)').selectOption({ index: 1 });
+  await page.getByRole('heading', { name: /^Rapports journaliers/ }).waitFor();
+  await page.getByText('Coulage du béton de propreté, ferraillage des semelles axe A à C.').waitFor();
+  const [rc] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'PDF', exact: true }).click()]);
+  await rc.saveAs(`${OUT}/rapport-chantier.pdf`);
+  await page.getByRole('option', { name: /Comparatif budget/ }).click();
+  await page.getByLabel('Projet (obligatoire)').selectOption({ index: 1 });
+  await page.getByRole('heading', { name: /^Par lot/ }).waitFor();
+  await shot(page, '31-comparatif-budget');
+  ok('rapport de chantier (avancement, rapports journaliers, réserves) et comparatif budget / réel par lot');
+
+  await nav(page, 'Clients et fournisseurs');
+  await page.getByText('M. Hounkpè Codjo').filter({ visible: true }).first().click();
+  await page.getByText('Situation financière du client').waitFor();
+  await page.getByText(/FAC-\d{4}-0001/).filter({ visible: true }).first().waitFor();
+  await page.getByText('Historique des modifications de la fiche').waitFor();
+  await nav(page, 'Clients et fournisseurs');
+  await page.getByRole('tab', { name: 'Fournisseurs' }).click();
+  await page.getByText('Quincaillerie du Port').filter({ visible: true }).first().click();
+  await page.getByText('Commandes (1)').waitFor();
+  await page.getByText(/BC-\d{4}-0001/).filter({ visible: true }).first().waitFor();
+  ok('historiques : factures, paiements et solde du client ; commandes du fournisseur');
+
+  await nav(page, 'Tableau de bord');
+  await page.getByText('Chiffre d’affaires facturé').waitFor();
+  await page.getByRole('img', { name: 'Évolution mensuelle des recettes et des dépenses' }).waitFor();
+  await page.getByText('Répartition des coûts par lot').waitFor();
+  await page.getByText(/^45\s000\s000\sFCFA$/).first().waitFor(); // budget estimatif du projet, saisi à la création
+  await shot(page, '32-tableau-de-bord-complet');
+  ok('tableau de bord complet : facturé, encaissé, reste, dépenses, marges, alertes, graphiques');
+
   // ------------------------------------------------------------ plans : dessin, pièces, rendus
   await nav(page, 'Plans techniques');
   await page.getByRole('button', { name: 'Nouveau plan', exact: true }).click();
@@ -640,7 +685,7 @@ try {
 
   // ------------------------------------------------------------ tableau de bord rempli
   await nav(page, 'Tableau de bord');
-  await page.getByText('Budget par chantier').waitFor();
+  await page.getByText('Budget prévisionnel et dépenses réelles').waitFor();
   await shot(page, '15-tableau-de-bord');
   await nav(page, 'Journal d’activité');
   await page.getByText(/Nouvelle version/i).first().waitFor();

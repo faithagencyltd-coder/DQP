@@ -74,7 +74,7 @@ function Levels() {
   const exportCsv = () => {
     const csv = toCsv([['Code', 'Article', 'Unité', 'Dépôt', 'Quantité', 'Stock minimum', 'Alerte', 'Dernier mouvement'],
       ...shown.map((l) => { const it = itemMap.get(l.item_id); return [it?.code ?? '', it?.designation ?? '', it?.unit ?? '', whMap.get(l.warehouse_id)?.name ?? '', l.qty, l.min_qty ?? '', alertKeys.has(`${l.item_id}|${l.warehouse_id}`) ? 'oui' : '', l.last_move ?? '']; })]);
-    downloadBlob(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `stocks_${today()}.csv`);
+    downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `stocks_${today()}.csv`);
   };
   if (loading) return <Spinner />;
   if (!activeWh.length) return <Notice tone="navy">Créez d’abord un dépôt (onglet « Dépôts ») : magasin central, conteneur de chantier… Le stock est suivi par dépôt.</Notice>;
@@ -228,7 +228,7 @@ function Movements() {
   const exportCsv = () => {
     const csv = toCsv([['Date', 'Type', 'Code', 'Article', 'Unité', 'Dépôt', 'Quantité', 'Coût unitaire', 'Chantier', 'Lot', 'Motif'],
       ...list.map((m) => { const it = itemMap.get(m.item_id); return [m.moved_on, MOVE_KIND[m.kind], it?.code ?? '', it?.designation ?? '', it?.unit ?? '', whMap.get(m.warehouse_id)?.name ?? '', m.qty, m.unit_cost ?? '', pname.get(m.project_id ?? '') ?? '', m.lot ?? '', m.reason ?? '']; })]);
-    downloadBlob(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `mouvements_stock_${today()}.csv`);
+    downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `mouvements_stock_${today()}.csv`);
   };
   return (
     <Card bodyClass="p-0" title="Journal des mouvements" actions={<Allowed module="stocks" action="exporter"><Button size="sm" icon={<Download size={15} />} onClick={exportCsv} disabled={!list.length}>CSV</Button></Allowed>}>

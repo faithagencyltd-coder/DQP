@@ -28,7 +28,7 @@ export function ReservesView({ project }: { project: Project }) {
   const exportCsv = () => {
     const csv = toCsv([['Référence', 'Réserve', 'Description', 'Localisation', 'Lot', 'Intervenant', 'Constatée le', 'Échéance', 'Statut', 'Levée le', 'Note de levée', 'Photos'],
       ...all.map((r) => [r.reference, r.title, r.description ?? '', r.location ?? '', r.lot ?? '', r.assignee_label ?? '', r.raised_on, r.due_date ?? '', RESERVE_STATUS[r.status].label, r.lifted_on ?? '', r.lift_note ?? '', r.photos.length])]);
-    downloadBlob(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `reserves_${project.reference}_${now}.csv`);
+    downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `reserves_${project.reference}_${now}.csv`);
   };
   const pdf = async () => {
     setBusy(true);

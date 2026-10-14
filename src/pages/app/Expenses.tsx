@@ -41,7 +41,7 @@ export function ExpensesPage() {
   const exportCsv = () => {
     const csv = toCsv([['Date', 'Projet', 'Lot', 'Catégorie', 'Libellé', 'Fournisseur', 'Montant HT', 'Taxes', 'Montant TTC', 'État', 'Payée le', 'Mode', 'Réf. facture fournisseur', 'Justificatif'],
       ...list.map((e) => [e.expense_date, pname.get(e.project_id ?? '') ?? '', e.lot ?? '', EXPENSE_CATEGORIES[e.category], e.label, sname.get(e.supplier_id ?? '') ?? '', e.amount_ht, e.tax_amount, e.amount_ttc, EXPENSE_STATUS[e.status].label, e.paid_on ?? '', e.payment_method ? PAYMENT_METHODS[e.payment_method] : '', e.supplier_invoice_ref ?? '', e.receipt_path ? 'oui' : 'non'])]);
-    downloadBlob(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `depenses_${today()}.csv`);
+    downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `depenses_${today()}.csv`);
   };
   return (
     <>

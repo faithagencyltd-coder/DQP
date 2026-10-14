@@ -10,6 +10,7 @@ import { mapHeaders, parseCsv, toCsv } from '../../engine/csv';
 import { findDuplicates } from '../../engine/dedupe';
 import { formatMoney } from '../../engine/money';
 import { Badge, Button, Card, Checkbox, DataTable, EmptyState, Field, Input, KeyValue, Modal, Notice, PageHeader, SearchInput, Select, Spinner, Tabs, Textarea, useToast } from '../../ui';
+import { ClientHistory, ContactJournal, SupplierHistory } from './ContactHistory';
 import { Allowed } from '../../ui/guard';
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -266,7 +267,8 @@ export function ContactDetail() {
               </Link>
             ))}
           </Card>
-          <Notice tone="navy" title="Factures et paiements">L’historique des factures et des soldes s’affichera ici avec le module Facturation (phase 5).</Notice>
+          {x.kind === 'client' ? <ClientHistory contact={x} /> : <SupplierHistory contact={x} />}
+          <ContactJournal contact={x} />
         </div>
       </div>
       {edit && <ContactForm initial={x} existing={all.data ?? []} onClose={() => setEdit(false)} />}

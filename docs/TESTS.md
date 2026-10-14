@@ -21,6 +21,9 @@ Trois niveaux de tests automatisés, plus une recette manuelle.
   alertes de réapprovisionnement.
 - `tests/planning.test.ts` : durées, retards, grille du calendrier, dépendances non respectées, avancement
   par tâches (66,7 %), par quantités (70 %, tâche sans quantité exclue), pondéré (40 %), avancement prévu.
+- `tests/dashboard.test.ts` et `tests/reports.test.ts` : flux mensuels, indicateurs (avoirs déduits, brouillons
+  exclus, factures échues, marge prévisionnelle seulement sur les chantiers complets), budget / réel par lot,
+  rapports par période, quantitatif par lot (dimension manquante laissée vide).
 - `tests/rendu-ia.test.ts` : fonction serveur du rendu IA — session et propriétaire vérifiés, absence de
   clé = échec explicite et unités restituées, succès (image déposée, demande close), échec du
   fournisseur sans fuite de secret, consigne (géométrie conservée, aucun texte), format des requêtes
@@ -50,7 +53,7 @@ PGHOST=/chemin/socket PGPORT=5432 sh supabase/tests/run.sh   # utilisateur « po
 
 Pilote un vrai navigateur sur une pile locale (`scripts/local-stack/`) : PostgreSQL avec les migrations,
 PostgREST, et une passerelle qui joue l’authentification, le stockage et la fonction serveur de Supabase.
-53 étapes : inscription, confirmation, entreprise, client, doublon, projet et lots, article et ouvrage composé,
+57 étapes : inscription, confirmation, entreprise, client, doublon, projet et lots, article et ouvrage composé,
 métré, DQE, devis, PDF, Excel, validation, nouvelle version, invitation d’un métreur sur téléphone,
 permissions, demande d’abonnement (offre Professionnelle), activation par l’administration ; facture
 d’acompte depuis le devis, émission, paiement partiel, PDF, dépense, onglet Finances du chantier ; dépôts,
@@ -58,7 +61,8 @@ demande d’achat approuvée, bon de commande (480 000), réception partielle, t
 du stock, inventaire avec écart, alerte sous le minimum, journal des mouvements ; planning (quatre tâches,
 dépendance non respectée et retard signalés, validation, avancement 25 %), rapport journalier avec effectifs,
 sorties de stock reprises, photo, soumission, validation et PDF, réserve levée puis validée, fiche chantier ;
-puis plans :
+rapports (financier en PDF, Excel et CSV, rapport de chantier, comparatif budget / réel), historiques client et
+fournisseur, tableau de bord complet (budget du projet repris) ; puis plans :
 dessin (murs, cloison à la longueur saisie, porte, fenêtre), détection des pièces (26,18 m² et 32,98 m²),
 aménagement, rendu fidèle (PDF, DXF), rendu IA, métré tiré du plan, import d’un plan scanné, calibration,
 détection sur les traits de l’image, éditeur sur téléphone ; enfin tableau de bord et journal.

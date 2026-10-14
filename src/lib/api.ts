@@ -10,7 +10,9 @@ type Filter = (q: any) => any; // eslint-disable-line @typescript-eslint/no-expl
 
 export function useRows<T>(table: string, orgId: string | undefined, opts: { select?: string; order?: [string, boolean?]; filter?: Filter; key?: unknown[]; enabled?: boolean; limit?: number } = {}) {
   return useQuery({
-    queryKey: [table, orgId, ...(opts.key ?? [])],
+    // Les colonnes demandées font partie de la clé : deux lectures partielles différentes de la même
+    // table ne doivent jamais partager le même cache.
+    queryKey: [table, orgId, ...(opts.key ?? []), opts.select ?? '*', opts.limit ?? null, opts.order?.join(':') ?? null],
     enabled: !!orgId && opts.enabled !== false,
     queryFn: async () => {
       let q = supabase.from(table).select(opts.select ?? '*').eq('org_id', orgId!);

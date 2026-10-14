@@ -18,10 +18,10 @@ function detailText(d: Record<string, unknown> | null): string {
   return Object.entries(d).filter(([, v]) => v !== null && v !== undefined).map(([k, v]) => `${k} : ${Array.isArray(v) ? v.map(fmt).join(' → ') : fmt(v)}`).join(' ; ');
 }
 
-export function ActivityList({ projectId, limit = 300, compact }: { projectId?: string; limit?: number; compact?: boolean }) {
+export function ActivityList({ projectId, entityId, limit = 300, compact }: { projectId?: string; entityId?: string; limit?: number; compact?: boolean }) {
   const { org } = useOrg();
   const team = useTeam(org?.id);
-  const rows = useRows<ActivityRow>('activity_log', org?.id, { order: ['at', false], filter: projectId ? (q) => q.eq('project_id', projectId) : undefined, limit, key: [projectId ?? 'all', limit] });
+  const rows = useRows<ActivityRow>('activity_log', org?.id, { order: ['at', false], filter: entityId ? (q) => q.eq('entity_id', entityId) : projectId ? (q) => q.eq('project_id', projectId) : undefined, limit, key: [entityId ?? projectId ?? 'all', limit] });
   const [q, setQ] = useState('');
   const [entity, setEntity] = useState('');
   const who = useMemo(() => new Map((team.data ?? []).map((m) => [m.user_id, personName(m.profile)])), [team.data]);
@@ -29,7 +29,7 @@ export function ActivityList({ projectId, limit = 300, compact }: { projectId?: 
   if (rows.isLoading) return <Spinner />;
   return (
     <div>
-      {!projectId && !compact && (
+      {!projectId && !entityId && !compact && (
         <div className="mb-3 flex flex-col gap-2 sm:flex-row">
           <SearchInput value={q} onChange={setQ} placeholder="Action, élément, utilisateur…" className="sm:max-w-sm sm:flex-1" />
           <Select value={entity} onChange={(e) => setEntity(e.target.value)} className="sm:w-56"><option value="">Tous les éléments</option>{Object.entries(ENTITY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>

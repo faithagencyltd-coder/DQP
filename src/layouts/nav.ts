@@ -1,7 +1,7 @@
 // Menu principal (§4.1), dans l'ordre du cahier des charges. Chaque entrée indique son
 // module (pour l'adapter au rôle) et son état réel : disponible ou à venir (phase prévue).
 import {
-  Banknote, Bot, Boxes, Briefcase, Building2, CalendarRange, Calculator, ClipboardList, CreditCard, FileSpreadsheet, FileText,
+  Banknote, BarChart3, Bot, Boxes, Briefcase, Building2, CalendarRange, Calculator, ClipboardList, CreditCard, FileSpreadsheet, FileText,
   FolderOpen, LayoutDashboard, Library, Map, Receipt, Settings, ShieldCheck, ShoppingCart, Users,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
@@ -32,7 +32,8 @@ export const NAV: NavItem[] = [
   { path: '/app/factures', label: 'Facturation', icon: Receipt, module: 'factures', group: 'gestion' },
   { path: '/app/depenses', label: 'Dépenses', icon: Banknote, module: 'depenses', group: 'gestion' },
   { path: '/app/planning', label: 'Planning', icon: CalendarRange, module: 'planning', group: 'gestion' },
-  { path: '/app/documents', label: 'Documents et rapports', icon: FolderOpen, module: 'documents', group: 'gestion' },
+  { path: '/app/rapports', label: 'Rapports', icon: BarChart3, module: 'rapports', group: 'gestion' },
+  { path: '/app/documents', label: 'Documents', icon: FolderOpen, module: 'documents', group: 'gestion' },
   { path: '/app/assistant', label: 'Assistant IA', icon: Bot, group: 'gestion', soon: 'Phase 4' },
   { path: '/app/abonnement', label: 'Abonnement', icon: CreditCard, group: 'compte' },
   { path: '/app/parametres', label: 'Paramètres', icon: Settings, group: 'compte' },

@@ -78,7 +78,7 @@ function TasksView({ project }: { project: Project }) {
     const byId = new Map(list.map((t) => [t.id, t.title]));
     const csv = toCsv([['Tâche', 'Lot', 'Responsable', 'Début', 'Fin', 'Durée (jours)', 'Statut', 'Priorité', 'Dépend de', 'Quantité prévue', 'Quantité exécutée', 'Unité', 'Poids', 'Avancement déclaré (%)', 'Observations'],
       ...list.map((t) => [t.title, t.lot ?? '', who(t), t.start_date, t.end_date, durationDays(t.start_date, t.end_date), TASK_STATUS[t.status].label, TASK_PRIORITY[t.priority].label, t.depends_on.map((d) => byId.get(d) ?? '').join(' ; '), t.planned_qty ?? '', t.done_qty ?? '', t.unit ?? '', t.weight ?? '', t.progress_pct ?? '', t.observations ?? ''])]);
-    downloadBlob(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `planning_${project.reference}_${now}.csv`);
+    downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `planning_${project.reference}_${now}.csv`);
   };
   const views = [
     { id: 'chronologie' as const, label: 'Chronologie', icon: <GanttChart size={15} /> },
