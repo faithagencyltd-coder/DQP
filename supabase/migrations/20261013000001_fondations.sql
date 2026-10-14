@@ -224,6 +224,14 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------- fonctions d'accès
+-- Double authentification (§5.2, §27.1) : si l'utilisateur a activé un second facteur, toute
+-- action exige une session vérifiée par ce facteur (niveau « aal2 »), y compris côté serveur.
+create or replace function public.mfa_ok() returns boolean
+language sql stable security definer set search_path = '' as $$
+  select coalesce(auth.jwt() ->> 'aal', 'aal1') = 'aal2'
+      or not exists (select 1 from auth.mfa_factors f where f.user_id = auth.uid() and f.status = 'verified')
+$$;
+
 create or replace function public.is_platform_admin() returns boolean
 language sql stable security definer set search_path = '' as $$
   select exists (
@@ -234,7 +242,7 @@ $$;
 
 create or replace function public.is_member(p_org uuid) returns boolean
 language sql stable security definer set search_path = '' as $$
-  select exists (select 1 from public.members m where m.org_id = p_org and m.user_id = auth.uid())
+  select public.mfa_ok() and exists (select 1 from public.members m where m.org_id = p_org and m.user_id = auth.uid())
 $$;
 
 create or replace function public.org_active(p_org uuid) returns boolean
@@ -258,6 +266,7 @@ language sql stable security definer set search_path = '' as $$
     join public.organizations o on o.id = m.org_id
     join public.subscription_plans sp on sp.id = o.plan_id
     where m.org_id = p_org and m.user_id = auth.uid()
+      and public.mfa_ok()
       and (
         m.role = 'proprietaire'
         or exists (select 1 from public.role_permissions rp
@@ -352,8 +361,11 @@ create policy "invitations supprimées" on public.invitations for delete to auth
   using (public.can(org_id, 'equipe', 'supprimer') or public.can(org_id, 'equipe', 'administrer'));
 revoke update on public.invitations from anon, authenticated;
 
+-- L'administration de la plateforme ne voit que les opérations d'administration (entreprise,
+-- membres, rôles, abonnement), pas le contenu métier des entreprises (§24.2).
 create policy "journal visible" on public.activity_log for select to authenticated
-  using ((org_id is not null and public.is_member(org_id)) or public.is_platform_admin());
+  using ((org_id is not null and public.is_member(org_id))
+         or (public.is_platform_admin() and entity in ('entreprise', 'membre', 'rôle', 'abonnement')));
 revoke insert, update, delete on public.activity_log from anon, authenticated;
 
 -- ---------------------------------------------------------------- fonctions métier

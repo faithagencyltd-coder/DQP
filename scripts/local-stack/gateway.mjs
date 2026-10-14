@@ -225,6 +225,8 @@ async function proxyRest(req, res, url) {
   const headers = { ...req.headers };
   delete headers.host;
   delete headers['content-length'];
+  // Comme Supabase : la clé publiable (non JWT) vaut accès anonyme.
+  if (!bearer(req)) delete headers.authorization;
   const r = await fetch(target, { method: req.method, headers, body });
   const out = Buffer.from(await r.arrayBuffer());
   const h = {};

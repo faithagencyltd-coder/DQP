@@ -282,6 +282,9 @@ begin
   elsif tg_table_name = 'metres' then
     if coalesce(new.reference, '') = '' then new.reference := public.next_number(new.org_id, 'metre', 'MET'); end if;
   elsif tg_table_name = 'quotes' then
+    if new.client_id is null and new.project_id is not null then
+      select p.client_id into new.client_id from public.projects p where p.id = new.project_id and p.org_id = new.org_id;
+    end if;
     if coalesce(new.reference, '') = '' then
       new.reference := public.next_number(new.org_id, new.kind, case new.kind when 'devis' then 'DEV' when 'dqe' then 'DQE' else 'BPU' end);
     end if;
@@ -343,7 +346,13 @@ begin
   if tg_op = 'INSERT' then v_action := 'création';
   elsif tg_op = 'DELETE' then v_action := 'suppression';
   else
-    if (r ->> 'archived_at') is not null and (o ->> 'archived_at') is null then v_action := 'archivage';
+    if tg_table_name = 'quotes' and (r ->> 'version') <> (o ->> 'version') then
+      v_action := 'nouvelle version';
+      v_detail := jsonb_build_object('version', r -> 'version');
+    elsif tg_table_name = 'quotes' and (r ->> 'locked') = 'true' and (o ->> 'locked') = 'false' then
+      v_action := 'validation et verrouillage';
+      v_detail := jsonb_build_object('version', r -> 'version');
+    elsif (r ->> 'archived_at') is not null and (o ->> 'archived_at') is null then v_action := 'archivage';
     elsif (r ->> 'archived_at') is null and (o ->> 'archived_at') is not null then v_action := 'restauration';
     elsif r ? 'status' and (r ->> 'status') <> (o ->> 'status') then
       v_action := 'changement de statut';
@@ -352,10 +361,6 @@ begin
       v_action := 'modification du budget';
       v_detail := jsonb_build_object('estimatif', jsonb_build_array(o -> 'budget_estimate', r -> 'budget_estimate'), 'validé', jsonb_build_array(o -> 'budget_validated', r -> 'budget_validated'));
     elsif tg_table_name = 'metres' and (r -> 'lines') <> (o -> 'lines') then v_action := 'modification des quantités';
-    elsif tg_table_name = 'quotes' and (r ->> 'version') <> (o ->> 'version') then
-      v_action := 'nouvelle version';
-      v_detail := jsonb_build_object('version', r -> 'version');
-    elsif tg_table_name = 'quotes' and (r ->> 'locked') = 'true' and (o ->> 'locked') = 'false' then v_action := 'verrouillage';
     else v_action := 'modification';
     end if;
   end if;
@@ -390,7 +395,7 @@ begin
   if not public.can(q.org_id, v_module, 'modifier') then raise exception 'Droit « modifier » requis'; end if;
   insert into public.quote_versions (org_id, quote_id, version, title, status, body, settings, total_ht, total_ttc, reason)
   values (q.org_id, q.id, q.version, q.title, q.status, q.body, q.settings, q.total_ht, q.total_ttc, p_reason)
-  on conflict (quote_id, version) do nothing;
+  on conflict (quote_id, version) do update set reason = coalesce(excluded.reason, public.quote_versions.reason);
   perform set_config('planora.server_change', 'on', true);
   update public.quotes set locked = false, version = q.version + 1,
     status = 'brouillon', validated_by = null, validated_at = null

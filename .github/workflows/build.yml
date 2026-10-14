@@ -1,15 +1,25 @@
-name: DQP — tests et installateur Windows
+name: PLANORA BTP — tests et publication
 
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  checks:
+  tests:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,14 +28,26 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+      - name: Moteur de calcul, PDF, Excel, import
+        run: npm test
+      - name: Sécurité et règles de la base (RLS)
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGPASSWORD: postgres
+        run: sh supabase/tests/run.sh
 
-  windows-installer:
-    needs: checks
-    runs-on: windows-latest
+  publication:
+    # Publie le site seulement quand le projet Supabase est configuré (variables du dépôt).
+    needs: tests
+    if: github.ref == 'refs/heads/main' && vars.SUPABASE_URL != ''
+    runs-on: ubuntu-latest
     permissions:
-      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,25 +55,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run dist:win
-      - uses: actions/upload-artifact@v4
-        with:
-          name: DQP-Setup-windows
-          path: release/DQP-Setup-*.exe
-          if-no-files-found: error
-      # Sur la branche main : si la version de package.json n'est pas encore publiée,
-      # GitHub crée l'étiquette vX.Y.Z et la version dans « Releases » (téléchargement direct).
-      - name: Publier la version
-        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-        shell: bash
+      - run: npx vite build
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          V="v$(node -p "require('./package.json').version")"
-          if gh release view "$V" >/dev/null 2>&1; then
-            echo "La version $V est déjà publiée."
-            exit 0
-          fi
-          gh release create "$V" release/DQP-Setup-*.exe --target "$GITHUB_SHA" \
-            --title "DQP ${V#v}" \
-            --notes "Installateur Windows de DQP ${V#v}. Non signé : Windows peut afficher « Windows a protégé votre ordinateur » ; cliquer sur Informations complémentaires, puis Exécuter quand même."
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          VITE_APP_VERSION: ${{ github.sha }}
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,68 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+
+/* Mini-charte PLANORA BTP (cahier des charges §2.2) — voir docs/CHARTE_GRAPHIQUE.md */
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --color-navy-950: #0a1628;
+  --color-navy-900: #0f1f38;
+  --color-navy-800: #16294a;
+  --color-navy-700: #1f3a63;
+  --color-navy-600: #2d4f80;
+  --color-navy-100: #e6ecf5;
+  --color-navy-50: #f2f5fa;
+  --color-signal-700: #b9470c;
+  --color-signal-600: #d9570f;
+  --color-signal-500: #f26a1b;
+  --color-signal-400: #f6894a;
+  --color-signal-100: #fde8da;
+  --color-signal-50: #fff5ee;
+  --color-ink: #1b2433;
+  --color-ink-2: #3b4658;
+  --color-muted: #667085;
+  --color-faint: #98a2b3;
+  --color-line: #e3e8ef;
+  --color-line-2: #eef1f5;
+  --color-canvas: #f5f7fa;
+  --color-ok-600: #15803d;
+  --color-ok-50: #ecfdf3;
+  --color-warn-600: #b45309;
+  --color-warn-50: #fffaeb;
+  --color-bad-600: #c42b1c;
+  --color-bad-50: #fef3f2;
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.06);
+  --shadow-pop: 0 12px 32px -8px rgba(16, 24, 40, 0.22), 0 4px 8px -4px rgba(16, 24, 40, 0.08);
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+}
+:focus-visible { outline: 2px solid var(--color-signal-500); outline-offset: 2px; }
+::selection { background: var(--color-signal-100); }
+.tabular { font-variant-numeric: tabular-nums; }
+
+@layer components {
+  .input {
+    @apply h-10 w-full rounded-lg border border-line bg-white px-3 text-[14px] text-ink outline-none transition-colors placeholder:text-faint focus:border-navy-600 focus:ring-2 focus:ring-navy-100 disabled:bg-line-2 disabled:text-muted;
+  }
+  textarea.input { @apply h-auto py-2; }
+  select.input { @apply pr-8; }
+  .cell-input {
+    @apply w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-[13px] outline-none hover:border-line focus:border-navy-600 focus:bg-white;
+  }
+  .link { @apply font-medium text-navy-700 underline-offset-2 hover:underline; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+}
+
+@keyframes pl-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.anim-in { animation: pl-fade 160ms ease-out both; }
+@media (prefers-reduced-motion: reduce) { .anim-in { animation: none; } }

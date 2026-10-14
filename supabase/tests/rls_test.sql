@@ -217,4 +217,27 @@ select tests.check((select plan_id from public.organizations where id = tests.id
 select tests.check((select count(*) from public.organizations) = 2, 'l''administrateur voit les entreprises');
 select tests.check((select count(*) from public.contacts where org_id = tests.id('org2')::uuid) = 0, 'l''administrateur ne lit pas le contenu des entreprises');
 
+
+-- ------------------------------------------------------------ demandes d'abonnement
+select tests.login('00000000-0000-0000-0000-00000000000b');
+insert into tests.ids values ('req', public.request_subscription(tests.id('org2')::uuid, 'entreprise', 'an', 'mobile_money', '+225 07 00 00 00', null));
+select tests.check((select amount from public.billing_requests) = 799000, 'montant de la demande tiré de l''offre (pas du client)');
+select tests.fails(format('select public.request_subscription(%L, ''pro'', ''mois'', null, null, null)', tests.id('org2')), 'déjà en attente', 'une seule demande en attente');
+select tests.fails(format('select public.admin_handle_request(%L, true, null)', tests.id('req')), 'Réservé', 'seule la plateforme traite les demandes');
+select tests.fails('update public.billing_requests set status = ''traitee''', 'permission denied', 'le client ne valide pas sa propre demande');
+select tests.login('00000000-0000-0000-0000-00000000000a');
+select public.admin_handle_request(tests.id('req')::uuid, true, 'Mobile Money reçu');
+select tests.check((select plan_id = 'entreprise' and plan_status = 'actif' and plan_ends_at > now() + interval '11 months' from public.organizations where id = tests.id('org2')::uuid), 'offre activée pour un an après traitement');
+select tests.check((select count(*) from public.activity_log where org_id = tests.id('org2')::uuid and entity = 'abonnement') >= 2, 'l''administration voit les opérations d''abonnement');
+select tests.check((select count(*) from public.activity_log where org_id = tests.id('org2')::uuid and entity = 'contacts') = 0, 'l''administration ne voit pas le journal métier des entreprises');
+
+-- ------------------------------------------------------------ double authentification
+reset role;
+insert into auth.mfa_factors (user_id, status) values ('00000000-0000-0000-0000-00000000000b', 'verified');
+set role authenticated;
+select tests.login('00000000-0000-0000-0000-00000000000b');
+select tests.check((select count(*) from public.organizations) = 0, 'second facteur activé : rien n''est accessible sans le vérifier');
+select set_config('request.jwt.claims', json_build_object('sub', '00000000-0000-0000-0000-00000000000b', 'role', 'authenticated', 'aal', 'aal2')::text, false);
+select tests.check((select count(*) from public.organizations) = 1, 'session vérifiée par le second facteur : accès rétabli');
+
 \echo 'TOUS LES TESTS DE SÉCURITÉ SONT PASSÉS'

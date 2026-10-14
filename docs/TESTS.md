@@ -1,0 +1,57 @@
+# PLANORA BTP — documentation de test
+
+Trois niveaux de tests automatisés, plus une recette manuelle.
+
+## 1. Moteur de calcul, PDF et Excel — `npm test`
+
+- `tests/engine.test.ts` : arrondis FCFA (1,005 → 1,01), lecture des nombres saisis en français, montants
+  en lettres, conversions d’unités (seulement si le facteur est connu), métrés (5 m × 4 m = 20 m² avant
+  déduction, volume, périmètre, mur net avec seuil de déduction, dimension manquante jamais devinée,
+  pertes, formule libre sûre), DQE / BPU / devis (montant de ligne arrondi, sous-totaux, remise, TVA,
+  lignes incomplètes non comptées), déboursé sec (trois méthodes), CSV, doublons.
+- `tests/documents.test.ts` : le PDF et l’Excel d’un devis contiennent **exactement** les montants du moteur.
+- `tests/import.test.ts` : import d’un DQE Excel (lots, sous-parties, valeurs absentes signalées).
+
+## 2. Sécurité et règles de la base — `sh supabase/tests/run.sh`
+
+Applique les migrations sur un PostgreSQL vierge, avec un environnement qui imite Supabase
+(`supabase/tests/shim_supabase.sql`), puis exécute `supabase/tests/rls_test.sql` : 78 contrôles, parmi lesquels :
+isolation entre entreprises (lecture, écriture, fichiers, journal), permissions par rôle et matrice
+modifiable, invitations, limites d’offre, abonnement échu en lecture seule, versions verrouillées, métré
+approuvé figé, historique des prix, demandes d’abonnement, administration sans accès au contenu,
+double authentification.
+
+```bash
+PGHOST=/chemin/socket PGPORT=5432 sh supabase/tests/run.sh   # utilisateur « postgres »
+```
+
+## 3. Recette de bout en bout — `node scripts/e2e.mjs`
+
+Pilote un vrai navigateur sur une pile locale (`scripts/local-stack/`) : PostgreSQL avec les migrations,
+PostgREST, et une passerelle qui joue l’authentification et le stockage de Supabase. 26 étapes :
+inscription, confirmation, entreprise, client, doublon, projet et lots, article et ouvrage composé,
+métré, DQE, devis, PDF, Excel, validation, nouvelle version, invitation d’un métreur sur téléphone,
+permissions, demande d’abonnement, activation par l’administration, tableau de bord et journal.
+
+```bash
+PGHOST=… PGPORT=… sh scripts/local-stack/start.sh
+VITE_SUPABASE_URL=http://localhost:54320 VITE_SUPABASE_PUBLISHABLE_KEY=locale npx vite build
+node scripts/e2e.mjs /tmp/captures
+```
+
+## 4. Recette manuelle (environnement de test en ligne)
+
+1. Créer un compte, ouvrir le lien de confirmation, se connecter.
+2. Créer l’entreprise ; dans Paramètres, ajouter le logo, l’IFU / RCCM, vérifier la TVA.
+3. Créer un client, puis un second avec le même téléphone : le doublon doit être signalé.
+4. Créer un projet avec les lots standard ; modifier un lot.
+5. Bibliothèque de prix : créer un article daté et sourcé, puis un ouvrage composé ; vérifier le calcul affiché.
+6. Métré : saisir 5 × 4 en surface (20,00 m²), laisser une hauteur vide sur un volume (« à compléter »).
+7. Générer le DQE, renseigner les prix (saisie, bibliothèque), créer le devis, ajouter une remise.
+8. Télécharger le PDF et l’Excel : comparer les totaux avec l’écran.
+9. Valider et verrouiller ; essayer de modifier (impossible) ; créer une nouvelle version.
+10. Inviter un collaborateur « métreur », ouvrir le lien sur un téléphone, vérifier qu’il ne peut pas créer de client.
+11. Activer la double authentification, se déconnecter, se reconnecter avec le code.
+
+Critère : chaque étape doit réussir sans message d’erreur, et aucun montant ne doit différer entre
+l’écran, le PDF et l’Excel.
