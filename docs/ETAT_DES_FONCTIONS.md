@@ -1,4 +1,4 @@
-# PLANORA BTP — état des fonctions (version 0.2.0)
+# PLANORA BTP — état des fonctions (version 0.3.0)
 
 Liste exigée par le cahier des charges (§35, §36.8). « Terminé » signifie : l’action fonctionne réellement
 (base de données, calcul, fichier produit) et elle est couverte par un test automatisé.
@@ -90,6 +90,18 @@ Détail du module, des coûts et des limites : `docs/RENDU_PLANS.md`.
 | Assistance : demandes numérotées (AST-), échanges avec l’équipe PLANORA BTP, statuts, notification du demandeur | ✅ Terminé | contrôles SQL, recette 50 |
 | Historique de l’abonnement (inscription, activations, suspensions, échéances) et alertes avant échéance | ✅ Terminé | contrôles SQL, recette 51 |
 | Administration : comptes actifs, revenus enregistrés, règlements refusés, demandes en attente, incidents techniques, demandes d’assistance, journal technique | ✅ Terminé | contrôles SQL, recette 50 |
+
+## Bibliothèque des travaux depuis les DQE de l’entreprise (prompt maître, partie D)
+
+| Élément | État | Vérification |
+|---|---|---|
+| Import d’un DQE Excel dans la bibliothèque : désignations, unités, prix, corps d’état et section repris tels quels, cellule d’origine de chaque ligne, aperçu avant import, choix des ouvrages | ✅ Terminé | `tests/library-import.test.ts`, recette 62, essai local sur le DQE SENOU (non versionné) |
+| Anomalies signalées sans correction : prix manquant, prix à 0, même ouvrage à prix différents, doublons regroupés, formules cassées (`#REF!`), totaux incomplets, numérotation non unique, unités harmonisées | ✅ Terminé | idem |
+| Statut de validation (à vérifier / validé / rejeté), validation réservée au droit « Valider », tracée (qui, quand) ; source d’origine non modifiable ; journal des imports | ✅ Terminé | contrôles SQL, recette 62 |
+| Fiche d’ouvrage : corps d’état, section, méthode de métré, formule, observations ; filtres par corps d’état et statut ; export CSV avec ces colonnes | ✅ Terminé | recette 62 (filtre, fiche) |
+| Ouvrages « à vérifier » proposés dans les devis avec la mention « à vérifier » ; ouvrages rejetés exclus | ✅ Terminé | revue de code (pas de test automatisé dédié) |
+| Méthode de métré et formule **utilisées par le moteur de métré** | ⚠️ **À venir** | champs enregistrés et affichés ; le moteur ne les applique pas encore (phase 2, suite) |
+| Génération d’un DQE à partir de la bibliothèque des travaux | ⚠️ **À venir** | phase 3 |
 
 ## Autres fonctions livrées
 

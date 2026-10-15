@@ -39,7 +39,7 @@ export function formatOf(fileName: string): FormatInfo {
     kind: 'other',
     label: ext.toUpperCase() || 'Inconnu',
     support: 'unsupported',
-    explanation: 'Format non reconnu par DQP.',
+    explanation: 'Format non reconnu par PLANORA BTP.',
   };
 }
 

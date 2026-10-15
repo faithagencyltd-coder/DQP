@@ -57,7 +57,7 @@ export function checkProject(project: Project, result: ProjectResult, prices: Pr
 
         // Écart avec le montant lu dans le fichier source (ligne non modifiée seulement).
         if (line.edits.length === 0 && line.sourceAmount != null && r?.amount != null && Math.abs(line.sourceAmount - r.amount) > 1) {
-          push('warning', 'SOURCE_AMOUNT', `Montant différent du fichier source pour « ${name} » : fichier ${formatNumber(line.sourceAmount)}, DQP ${formatNumber(r.amount)}.`, where);
+          push('warning', 'SOURCE_AMOUNT', `Montant différent du fichier source pour « ${name} » : fichier ${formatNumber(line.sourceAmount)}, PLANORA BTP ${formatNumber(r.amount)}.`, where);
         }
 
         // Prix de la bibliothèque modifié depuis son application.

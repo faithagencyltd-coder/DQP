@@ -461,6 +461,20 @@ select tests.login('00000000-0000-0000-0000-00000000000b');
 select tests.check((select count(*) from public.notifications where kind = 'support') = 1 and (select status from public.support_tickets) = 'en_cours', 'le demandeur est notifié ; demande prise en charge');
 select tests.fails('select * from public.admin_overview2()', 'Réservé', 'statistiques avancées réservées à la plateforme');
 
+-- ------------------------------------------------------------ bibliothèque des travaux (import DQE)
+select tests.login('00000000-0000-0000-0000-00000000000b');
+with x as (insert into public.library_imports (org_id, file_name, stats) values (tests.id('org2')::uuid, 'DQE_TEST.xlsx', '{"lignes": 1}') returning id) insert into tests.ids select 'imp', id from x;
+with x as (insert into public.price_items (org_id, kind, code, designation, unit, sale_price, trade, section, validation_status, source_ref, import_id)
+  values (tests.id('org2')::uuid, 'ouvrage', 'GO-001', 'Fouilles en trou et en rigole', 'm³', 2000, 'MACONNERIE - BETON', 'Rez-de-chaussée › D - Terrassement', 'a_verifier', '{"file":"DQE_TEST.xlsx","sheet":"Feuil1","cell":"B111"}', tests.id('imp')::uuid) returning id)
+insert into tests.ids select 'ouv', id from x;
+select tests.check((select validation_status = 'a_verifier' and validated_by is null from public.price_items where id = tests.id('ouv')::uuid), 'ouvrage importé : à vérifier');
+select tests.fails(format('update public.price_items set source_ref = ''{"file":"autre.xlsx"}'' where id = %L', tests.id('ouv')), 'permission denied', 'la source d''un ouvrage importé ne se réécrit pas');
+update public.price_items set validation_status = 'valide' where id = tests.id('ouv')::uuid;
+select tests.check((select validated_by = auth.uid() and validated_at is not null from public.price_items where id = tests.id('ouv')::uuid), 'validation tracée (qui, quand)');
+select tests.fails(format('update public.library_imports set file_name = ''x'' where id = %L', tests.id('imp')), 'permission denied', 'journal des imports non modifiable');
+select tests.login('00000000-0000-0000-0000-00000000000a');
+select tests.check((select count(*) from public.library_imports) = 0, 'isolation : A ne voit pas les imports de B');
+
 -- ------------------------------------------------------------ double authentification
 reset role;
 insert into auth.mfa_factors (user_id, status) values ('00000000-0000-0000-0000-00000000000b', 'verified');

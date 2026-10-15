@@ -741,6 +741,41 @@ try {
   await shot(page, '16-journal');
   ok('tableau de bord et journal d’activité alimentés par les vraies opérations');
 
+  // ------------------------------------------------------------ bibliothèque des travaux depuis un DQE Excel
+  {
+    const ExcelJS = (await import('exceljs')).default;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Feuil1');
+    ws.getCell('B2').value = 'DEVIS QUANTITATIF ET ESTIMATIF';
+    ws.getCell('B4').value = 'ELECTRICITE';
+    ws.getRow(5).values = ['N°', 'DESIGNATION', 'UNITE', 'QUANTITE', 'PRIX UNITAIRE', 'MONTANT'];
+    ws.getRow(6).values = [1, 'Fourniture et pose de prise 2P+T', 'u', 12, 3500, { formula: 'D6*E6', result: 42000 }];
+    ws.getRow(7).values = [2, 'Point lumineux simple allumage', 'u', 20];
+    ws.getRow(8).values = [3, 'Fourniture et pose de prise 2P+T', 'u', 4, 4000, { formula: 'D8*E8', result: 16000 }];
+    ws.getRow(9).values = [null, 'TOTAL ELECTRICITE', null, null, null, { formula: 'SUM(F6:F8)', result: 58000 }];
+    const xlsx = `${OUT}/dqe-electricite.xlsx`;
+    await wb.xlsx.writeFile(xlsx);
+    await nav(page, 'Bibliothèque de prix');
+    await page.getByRole('button', { name: 'Importer un DQE', exact: true }).click();
+    await page.getByLabel('Fichier DQE').setInputFiles(xlsx);
+    const dlg = page.getByRole('dialog');
+    await dlg.getByText('3 ligne(s) lue(s)').waitFor();
+    await dlg.getByText('1 sans prix').waitFor();
+    await dlg.getByText('2 à prix divergents').waitFor();
+    await shot(page, '24-import-dqe-bibliotheque');
+    await dlg.getByRole('button', { name: 'Ajouter 3 ouvrage(s)', exact: true }).click();
+    await page.getByText(/3 ouvrage\(s\) importé\(s\) restent « à vérifier »/).waitFor();
+    await page.getByRole('button', { name: 'Les afficher', exact: true }).click();
+    await page.getByText('Point lumineux simple allumage').filter({ visible: true }).first().click();
+    await page.getByRole('dialog').getByText('Origine dans le fichier (non modifiable)').waitFor();
+    await page.getByRole('dialog').getByRole('cell', { name: 'B7', exact: true }).waitFor();
+    await page.getByRole('dialog').getByRole('button', { name: 'Valider', exact: true }).click();
+    await page.getByText('Ouvrage validé.').waitFor();
+    await page.getByLabel('Statut de validation').selectOption('valide');
+    await page.getByText('Point lumineux simple allumage').filter({ visible: true }).first().waitFor();
+    ok('bibliothèque des travaux : DQE Excel importé (prix manquant et prix divergents signalés, cellules d’origine), ouvrage validé');
+  }
+
   console.log('RECETTE RÉUSSIE');
 } catch (e) {
   console.error('ÉCHEC :', e.message);

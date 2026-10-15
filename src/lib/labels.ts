@@ -66,7 +66,7 @@ export const CLIENT_TYPES: Record<string, string> = {
 };
 
 export const PRICE_CATEGORIES = [
-  'Ciment', 'Sable', 'Gravier', 'Fer à béton', 'Béton', 'Parpaings et briques', 'Bois', 'Charpente', 'Couverture', 'Peinture',
+  'Gros œuvre', 'Ciment', 'Sable', 'Gravier', 'Fer à béton', 'Béton', 'Parpaings et briques', 'Bois', 'Charpente', 'Couverture', 'Peinture',
   'Carrelage', 'Revêtements', 'Menuiserie bois', 'Menuiserie aluminium', 'Vitrerie', 'Électricité', 'Plomberie', 'Climatisation',
   'Étanchéité', 'Faux plafonds', 'Cloisons', 'Quincaillerie', 'Matériel de chantier', 'Main-d’œuvre', 'Location d’équipements',
   'Transport', 'Prestations spécialisées', 'Ouvrages composés', 'Autre',
@@ -164,4 +164,8 @@ export const REPORT_STATUS: Record<string, { label: string; tone: Tone6 }> = {
 };
 export const RESERVE_STATUS: Record<string, { label: string; tone: Tone6 }> = {
   ouverte: { label: 'Ouverte', tone: 'bad' }, en_cours: { label: 'En cours de levée', tone: 'warn' }, levee: { label: 'Levée', tone: 'navy' }, validee: { label: 'Levée et validée', tone: 'ok' },
+};
+
+export const VALIDATION_STATUS: Record<string, { label: string; tone: 'grey' | 'warn' | 'ok' | 'bad' }> = {
+  a_verifier: { label: 'À vérifier', tone: 'warn' }, valide: { label: 'Validé', tone: 'ok' }, rejete: { label: 'Rejeté', tone: 'bad' },
 };

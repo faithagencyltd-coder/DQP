@@ -27,8 +27,8 @@ export async function readWorkbook(data: ArrayBuffer | Uint8Array): Promise<Grid
   // ExcelJS accepte un Buffer (Node) ou un ArrayBuffer (navigateur).
   await wb.xlsx.load(data as ArrayBuffer);
   const grids: Grid[] = [];
-  // Feuilles annexes produites par DQP lui-même : ce ne sont pas des DQE à réimporter.
-  const fromDqp = (wb.creator ?? '').startsWith('DQP');
+  // Feuilles annexes produites par l'application elle-même (anciennement « DQP ») : ce ne sont pas des DQE à réimporter.
+  const fromDqp = /^(DQP|PLANORA BTP)/.test(wb.creator ?? '');
   wb.eachSheet((ws) => {
     if (fromDqp && ['Traçabilité', 'Contrôles'].includes(ws.name)) return;
     const grid = emptyGrid(ws.name);

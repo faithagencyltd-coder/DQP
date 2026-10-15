@@ -22,7 +22,7 @@ const BAD = 'FFFDE2E1';
 
 export async function exportDqeExcel(project: Project, result: ProjectResult, alerts: Alert[], appVersion: string): Promise<Uint8Array> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = `DQP ${appVersion}`;
+  wb.creator = `PLANORA BTP ${appVersion}`;
   wb.created = new Date();
   const cur = project.settings.currency;
 

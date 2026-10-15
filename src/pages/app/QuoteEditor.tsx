@@ -437,7 +437,7 @@ function PricePicker({ onClose, onPick }: { onClose: () => void; onPick: (p: Pri
   const [q, setQ] = useState('');
   const [all, setAll] = useState(false);
   const n = q.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  const list = (items.data ?? []).filter((p) => !p.archived_at && (all || !p.country || p.country === org?.country) && (!n || [p.code, p.designation, p.category].join(' ').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().includes(n))).slice(0, 80);
+  const list = (items.data ?? []).filter((p) => !p.archived_at && p.validation_status !== 'rejete' && (all || !p.country || p.country === org?.country) && (!n || [p.code, p.designation, p.category, p.trade].join(' ').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().includes(n))).slice(0, 80);
   return (
     <Modal title="Choisir un prix dans la bibliothèque" onClose={onClose} wide>
       <SearchInput value={q} onChange={setQ} placeholder="Code, désignation, catégorie…" />
@@ -449,7 +449,7 @@ function PricePicker({ onClose, onPick }: { onClose: () => void; onPick: (p: Pri
           return (
             <button key={p.id} disabled={p.sale_price === null} onClick={() => onPick(p)} className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[13px] hover:bg-navy-50 disabled:opacity-50">
               <span className="min-w-0"><span className="block truncate font-semibold text-navy-900">{p.designation}</span><span className="text-[11.5px] text-muted">{p.code || '—'} · {p.unit} · {[p.city, p.country].filter(Boolean).join(', ') || 'zone ?'} · {p.source ?? 'source ?'}</span></span>
-              <span className="text-right"><span className="tabular block font-bold">{p.sale_price === null ? 'sans prix de vente' : formatMoney(p.sale_price, p.currency)}</span><Badge tone={age.tone}>{age.label}</Badge></span>
+              <span className="text-right"><span className="tabular block font-bold">{p.sale_price === null ? 'sans prix de vente' : formatMoney(p.sale_price, p.currency)}</span>{p.validation_status === 'a_verifier' && <Badge tone="warn" className="mr-1">à vérifier</Badge>}<Badge tone={age.tone}>{age.label}</Badge></span>
             </button>
           );
         })}

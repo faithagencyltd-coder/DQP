@@ -9,7 +9,7 @@ const HEAD = ['Code', 'Désignation', 'Catégorie', 'Unité', 'Prix', 'Fournisse
 
 export async function pricesToXlsx(items: PriceItem[]): Promise<Uint8Array> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'DQP';
+  wb.creator = 'PLANORA BTP';
   const ws = wb.addWorksheet('Bibliothèque de prix', { views: [{ state: 'frozen', ySplit: 1 }] });
   ws.columns = [10, 48, 16, 8, 14, 22, 18, 12, 30, 40].map((width) => ({ width }));
   const h = ws.addRow(HEAD);

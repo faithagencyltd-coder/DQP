@@ -130,7 +130,7 @@ export function dqeHtml(project: Project, result: ProjectResult, appVersion: str
     `DQE — ${project.info.name}`,
     `${cover(project, 'DEVIS QUANTITATIF ET ESTIMATIF')}${legend}${lots}
      <h2>RÉCAPITULATIF GÉNÉRAL</h2>${recapTable(project, result)}
-     <div class="foot">Document produit par DQP ${esc(appVersion)} le ${new Date().toLocaleDateString('fr-FR')} — montants calculés par le moteur DQP (Quantité × Prix unitaire).</div>`,
+     <div class="foot">Document produit par PLANORA BTP ${esc(appVersion)} le ${new Date().toLocaleDateString('fr-FR')} — montants calculés par le moteur PLANORA BTP (Quantité × Prix unitaire).</div>`,
   );
 }
 
@@ -223,7 +223,7 @@ export function analysisReportHtml(project: Project, result: ProjectResult, aler
 
     <h2>6. Estimation</h2>
     ${recapTable(project, result)}
-    <div class="foot">Rapport généré par DQP ${esc(appVersion)} le ${new Date().toLocaleString('fr-FR')}. Les montants sont calculés par le moteur déterministe de DQP ; les éléments « à vérifier » et « non déterminés » doivent être contrôlés par un professionnel.</div>`,
+    <div class="foot">Rapport généré par PLANORA BTP ${esc(appVersion)} le ${new Date().toLocaleString('fr-FR')}. Les montants sont calculés par le moteur déterministe de PLANORA BTP ; les éléments « à vérifier » et « non déterminés » doivent être contrôlés par un professionnel.</div>`,
   );
 }
 

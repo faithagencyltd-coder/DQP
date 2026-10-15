@@ -300,7 +300,7 @@ export function parseDqeGrid(grid: Grid, file: SourceFile): ImportResult {
           'error',
           'BROKEN_FORMULA',
           `Formule cassée dans le fichier en ${cell.ref} (« ${label} ») : ${cell.formula ?? ''}` +
-            `${cell.error ? ` — le fichier affiche ${cell.error}` : ''}. DQP recalcule ce total à partir des lignes.`,
+            `${cell.error ? ` — le fichier affiche ${cell.error}` : ''}. PLANORA BTP recalcule ce total à partir des lignes.`,
           { source: src(file, grid, cell) },
         );
       }
@@ -338,7 +338,7 @@ export function parseDqeGrid(grid: Grid, file: SourceFile): ImportResult {
         'TOTAL_EXCLUDES_LINES',
         `Le total du lot « ${lot.name} » dans le fichier (${last.cell.ref} = ${formatMoney(shown)}) n’inclut pas ` +
           [...bySection].map(([title, ls]) => `la partie « ${title} » (${ls.length} ligne${ls.length > 1 ? 's' : ''} chiffrée${ls.length > 1 ? 's' : ''}, ${formatMoney(ls.reduce((s, m) => s + fileAmount(m), 0))})`).join(', ') +
-          `. Écart : ${formatMoney(total)}. DQP compte toutes les lignes du lot.`,
+          `. Écart : ${formatMoney(total)}. PLANORA BTP compte toutes les lignes du lot.`,
         { lotId: lot.id, source: src(file, grid, last.cell) },
       );
     }
@@ -415,7 +415,7 @@ export function parseDqeGrid(grid: Grid, file: SourceFile): ImportResult {
     for (const s of lot.sections) for (const l of s.lines) if (l.number) counts.set(l.number, (counts.get(l.number) ?? 0) + 1);
     const dup = [...counts].filter(([, n]) => n > 1);
     if (dup.length) {
-      alert('info', 'NUMBERING', `Numérotation non unique dans le lot « ${lot.name} » : ` + dup.map(([n, c]) => `N° ${n} utilisé ${c} fois`).join(', ') + '. À l’export, DQP numérote ce lot automatiquement (1.1, 1.2…).', { lotId: lot.id });
+      alert('info', 'NUMBERING', `Numérotation non unique dans le lot « ${lot.name} » : ` + dup.map(([n, c]) => `N° ${n} utilisé ${c} fois`).join(', ') + '. À l’export, PLANORA BTP numérote ce lot automatiquement (1.1, 1.2…).', { lotId: lot.id });
     }
   });
   const rawUnits = new Map<string, Set<string>>();

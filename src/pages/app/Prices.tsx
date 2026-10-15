@@ -1,7 +1,9 @@
-import { Archive, ArchiveRestore, Download, History, Library, Percent, Plus, Trash2, Upload } from 'lucide-react';
+import { Archive, ArchiveRestore, Ban, CheckCircle2, Download, FileSpreadsheet, History, Library, Percent, Plus, Trash2, Upload } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
-import { insertRow, updateRow, useAction, useRows } from '../../lib/api';
-import { COUNTRIES, PRICE_CATEGORIES, fmtDate } from '../../lib/labels';
+import { insertRow, insertRows, updateRow, useAction, useRows } from '../../lib/api';
+import { COUNTRIES, PRICE_CATEGORIES, VALIDATION_STATUS, fmtDate } from '../../lib/labels';
+import { errorMessage } from '../../lib/errors';
+import { FLAG_LABEL, candidateToRow, planLibraryImport, type CandidateFlag, type LibraryImportPlan } from '../../engine/library-import';
 import { useOrg } from '../../lib/session';
 import type { Contact, PriceItem } from '../../lib/types';
 import { downloadBlob } from '../../lib/download';
@@ -22,6 +24,13 @@ export function priceAge(p: Pick<PriceItem, 'price_date'>): { tone: 'ok' | 'warn
   return days > OLD_DAYS ? { tone: 'warn', label: `ancien (${fmtDate(p.price_date)})` } : { tone: 'ok', label: fmtDate(p.price_date) };
 }
 
+/** Cellules du fichier d'origine d'un ouvrage importé (traçabilité). */
+function sourceCells(p: PriceItem): string {
+  const r = p.source_ref;
+  if (!r?.sources?.length) return '';
+  return `${r.file ?? ''}${r.sheet ? ` / ${r.sheet}` : ''} : ${r.sources.map((x) => x.cell ?? '?').join(', ')}`;
+}
+
 export function PricesPage() {
   const { org } = useOrg();
   const items = useRows<PriceItem>('price_items', org?.id, { order: ['designation'] });
@@ -31,6 +40,9 @@ export function PricesPage() {
   const [cat, setCat] = useState('');
   const [kind, setKind] = useState('');
   const [country, setCountry] = useState('');
+  const [trade, setTrade] = useState('');
+  const [vstatus, setVstatus] = useState('');
+  const [dqeImport, setDqeImport] = useState(false);
   const [archived, setArchived] = useState(false);
   const [onlyOld, setOnlyOld] = useState(false);
   const [edit, setEdit] = useState<Partial<PriceItem> | null>(null);
@@ -38,14 +50,18 @@ export function PricesPage() {
   const [importing, setImporting] = useState(false);
   const [bulk, setBulk] = useState(false);
   const supplierName = useMemo(() => new Map((suppliers.data ?? []).map((s) => [s.id, s.name])), [suppliers.data]);
+  const trades = useMemo(() => [...new Set((items.data ?? []).map((p) => p.trade).filter((t): t is string => !!t))].sort(), [items.data]);
   const list = useMemo(() => (items.data ?? []).filter((p) => !!p.archived_at === archived && (!cat || p.category === cat) && (!kind || p.kind === kind)
     && (!country || p.country === country) && (!onlyOld || priceAge(p).tone !== 'ok')
-    && (!q || norm([p.code, p.designation, p.description, p.city, supplierName.get(p.supplier_id ?? '')].join(' ')).includes(norm(q)))), [items.data, archived, cat, kind, country, onlyOld, q, supplierName]);
+    && (!trade || p.trade === trade) && (!vstatus || (p.validation_status ?? 'valide') === vstatus)
+    && (!q || norm([p.code, p.designation, p.description, p.city, p.trade, p.section, supplierName.get(p.supplier_id ?? '')].join(' ')).includes(norm(q)))), [items.data, archived, cat, kind, country, onlyOld, trade, vstatus, q, supplierName]);
+  const toVerify = (items.data ?? []).filter((p) => !p.archived_at && p.validation_status === 'a_verifier').length;
   const cur = org?.currency ?? 'XOF';
 
   const exportCsv = () => {
-    const head = ['Code', 'Désignation', 'Type', 'Catégorie', 'Unité', 'Prix d’achat', 'Prix de vente', 'Devise', 'Pays', 'Ville', 'Date du prix', 'Source', 'Fournisseur', 'Pertes %', 'Conditions d’achat', 'Description'];
-    const rows = list.map((p) => [p.code, p.designation, p.kind, p.category, p.unit, p.purchase_price, p.sale_price, p.currency, p.country, p.city, p.price_date, p.source, supplierName.get(p.supplier_id ?? ''), p.loss_pct, p.purchase_conditions, p.description]);
+    const head = ['Code', 'Désignation', 'Type', 'Catégorie', 'Corps d’état', 'Section du DQE', 'Unité', 'Prix d’achat', 'Prix de vente', 'Devise', 'Pays', 'Ville', 'Date du prix', 'Source', 'Cellules d’origine', 'Statut', 'Méthode de métré', 'Formule', 'Observations', 'Fournisseur', 'Pertes %', 'Conditions d’achat', 'Description'];
+    const rows = list.map((p) => [p.code, p.designation, p.kind, p.category, p.trade, p.section, p.unit, p.purchase_price, p.sale_price, p.currency, p.country, p.city, p.price_date, p.source,
+      sourceCells(p), VALIDATION_STATUS[p.validation_status ?? 'valide'].label, p.metre_method, p.formula, p.observations, supplierName.get(p.supplier_id ?? ''), p.loss_pct, p.purchase_conditions, p.description]);
     downloadBlob(new Blob([toCsv([head, ...rows])], { type: 'text/csv;charset=utf-8' }), `bibliotheque_prix_${new Date().toISOString().slice(0, 10)}.csv`);
   };
 
@@ -53,18 +69,24 @@ export function PricesPage() {
     <>
       <PageHeader title="Bibliothèque de prix" subtitle="Matériaux, main-d’œuvre, matériel et ouvrages composés, par pays et par ville, avec date et source."
         actions={<>
+          <Allowed module="prix" action="creer"><Button icon={<FileSpreadsheet size={16} />} onClick={() => setDqeImport(true)}>Importer un DQE</Button></Allowed>
           <Allowed module="prix" action="creer"><Button icon={<Upload size={16} />} onClick={() => setImporting(true)}>Importer</Button></Allowed>
           <Allowed module="prix" action="exporter"><Button icon={<Download size={16} />} disabled={!list.length} onClick={exportCsv}>Exporter</Button></Allowed>
           <Allowed module="prix" action="modifier"><Button icon={<Percent size={16} />} disabled={!list.length} onClick={() => setBulk(true)}>Mise à jour en masse</Button></Allowed>
           <Allowed module="prix" action="creer"><Button variant="primary" icon={<Plus size={16} />} onClick={() => setEdit({ kind: 'article', unit: 'u', category: 'Autre', currency: cur, country: org?.country, city: org?.city ?? null, price_date: new Date().toISOString().slice(0, 10) })}>Nouvel article</Button></Allowed>
         </>} />
       <Tabs value={tab} onChange={setTab} items={[{ id: 'liste', label: 'Articles et ouvrages' }, { id: 'comparer', label: 'Comparer les prix' }]} />
+      {tab === 'liste' && toVerify > 0 && vstatus !== 'a_verifier' && (
+        <Notice tone="warn" className="mb-3">{toVerify} ouvrage(s) importé(s) restent « à vérifier ». <button className="font-semibold underline" onClick={() => setVstatus('a_verifier')}>Les afficher</button></Notice>
+      )}
       {tab === 'liste' ? (
         <Card bodyClass="p-0">
-          <div className="grid gap-2 border-b border-line-2 p-3 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_0.8fr_0.8fr_auto]">
-            <SearchInput value={q} onChange={setQ} placeholder="Code, désignation, ville, fournisseur…" />
+          <div className="grid gap-2 border-b border-line-2 p-3 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_0.8fr_0.8fr_0.8fr_auto]">
+            <SearchInput value={q} onChange={setQ} placeholder="Code, désignation, corps d’état, ville…" />
+            <Select aria-label="Corps d’état" value={trade} onChange={(e) => setTrade(e.target.value)}><option value="">Tous corps d’état</option>{trades.map((t) => <option key={t}>{t}</option>)}</Select>
             <Select value={cat} onChange={(e) => setCat(e.target.value)}><option value="">Toutes catégories</option>{PRICE_CATEGORIES.map((c) => <option key={c}>{c}</option>)}</Select>
             <Select value={kind} onChange={(e) => setKind(e.target.value)}><option value="">Articles et ouvrages</option><option value="article">Articles</option><option value="ouvrage">Ouvrages composés</option></Select>
+            <Select aria-label="Statut de validation" value={vstatus} onChange={(e) => setVstatus(e.target.value)}><option value="">Tous statuts</option>{Object.entries(VALIDATION_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</Select>
             <Select value={country} onChange={(e) => setCountry(e.target.value)}><option value="">Tous pays</option>{Object.entries(COUNTRIES).filter(([k]) => k !== 'AUTRE').map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
             <div className="flex flex-col justify-center gap-1"><Checkbox label="Prix anciens" checked={onlyOld} onChange={setOnlyOld} /><Checkbox label="Archives" checked={archived} onChange={setArchived} /></div>
           </div>
@@ -73,11 +95,12 @@ export function PricesPage() {
               empty={<EmptyState icon={<Library size={22} />} title="Aucun prix">Ajoutez vos articles (avec la date et la source du prix) ou importez un fichier CSV / Excel.</EmptyState>}
               columns={[
                 { key: 'code', label: 'Code', sort: (p) => p.code, render: (p) => <span className="tabular text-muted">{p.code || '—'}</span>, hideOnMobile: true },
-                { key: 'des', label: 'Désignation', sort: (p) => norm(p.designation), render: (p) => <div><div className="font-semibold text-navy-900">{p.designation} {p.kind === 'ouvrage' && <Badge tone="navy">ouvrage</Badge>}</div><div className="text-[12px] text-muted">{p.category}{p.supplier_id ? ` · ${supplierName.get(p.supplier_id) ?? ''}` : ''}</div></div> },
+                { key: 'des', label: 'Désignation', sort: (p) => norm(p.designation), render: (p) => <div title={p.source ? `Source : ${p.source}` : undefined}><div className="font-semibold text-navy-900">{p.designation} {p.kind === 'ouvrage' && <Badge tone="navy">ouvrage</Badge>}</div><div className="text-[12px] text-muted">{p.trade ?? p.category}{p.section ? ` · ${p.section}` : ''}{p.supplier_id ? ` · ${supplierName.get(p.supplier_id) ?? ''}` : ''}</div></div> },
                 { key: 'unit', label: 'Unité', render: (p) => p.unit },
                 { key: 'buy', label: 'Achat', align: 'right', sort: (p) => p.purchase_price, render: (p) => formatMoney(p.purchase_price, p.currency, false), hideOnMobile: true },
                 { key: 'sell', label: 'Vente', align: 'right', sort: (p) => p.sale_price, render: (p) => <b>{formatMoney(p.sale_price, p.currency, false)}</b> },
                 { key: 'zone', label: 'Zone', render: (p) => [p.city, p.country].filter(Boolean).join(', ') || '—', hideOnMobile: true },
+                { key: 'st', label: 'Statut', sort: (p) => p.validation_status ?? 'valide', render: (p) => { const v = VALIDATION_STATUS[p.validation_status ?? 'valide']; return <Badge tone={v.tone}>{v.label}</Badge>; }, hideOnMobile: true },
                 { key: 'date', label: 'Date du prix', sort: (p) => p.price_date ?? '', render: (p) => { const a = priceAge(p); return <Badge tone={a.tone}>{a.label}</Badge>; } },
                 { key: 'h', label: '', render: (p) => <button className="rounded p-1.5 text-ink-2 hover:bg-navy-50" aria-label="Historique" title="Historique des prix" onClick={(e) => { e.stopPropagation(); setHist(p); }}><History size={16} /></button> },
               ]} />
@@ -88,6 +111,7 @@ export function PricesPage() {
       {edit && <PriceForm initial={edit} items={items.data ?? []} suppliers={suppliers.data ?? []} onClose={() => setEdit(null)} />}
       {hist && <PriceHistory item={hist} onClose={() => setHist(null)} />}
       {importing && <PriceImport onClose={() => setImporting(false)} />}
+      {dqeImport && <DqeLibraryImport items={items.data ?? []} onClose={() => setDqeImport(false)} />}
       {bulk && <BulkUpdate items={list} onClose={() => setBulk(false)} />}
     </>
   );
@@ -208,17 +232,29 @@ function PriceForm({ initial, items, suppliers, onClose }: { initial: Partial<Pr
       purchase_price: isOuvrage ? r.ds : parseNumber(nums.buy), sale_price: isOuvrage ? r.salePrice : parseNumber(nums.sell), currency: cur,
       supplier_id: f.supplier_id || null, country: f.country || null, city: f.city, price_date: f.price_date || null, source: f.source,
       purchase_conditions: f.purchase_conditions, loss_pct: parseNumber(nums.loss), breakdown: isOuvrage ? bd : null,
+      trade: f.trade || null, section: f.section || null, metre_method: f.metre_method || null, formula: f.formula || null, observations: f.observations || null,
     };
     return f.id ? updateRow('price_items', f.id, values) : insertRow('price_items', { ...values, org_id: org!.id });
   }, { success: 'Prix enregistré.', invalidate: [['price_items']] });
   const archive = useAction(() => updateRow('price_items', f.id!, { archived_at: f.archived_at ? null : new Date().toISOString() }), { success: f.archived_at ? 'Article restauré.' : 'Article archivé.', invalidate: [['price_items']] });
+  const validate = useAction((status: 'valide' | 'rejete') => updateRow<PriceItem>('price_items', f.id!, { validation_status: status }), { success: (r: PriceItem) => (r.validation_status === 'valide' ? 'Ouvrage validé.' : 'Ouvrage rejeté : il n’est plus proposé dans les devis.'), invalidate: [['price_items']] });
+  const vs = initial.validation_status ?? 'valide';
+  const refs = initial.source_ref;
   return (
     <Modal title={f.id ? `Article ${f.code || ''} — ${initial.designation}` : 'Nouvel article de prix'} onClose={onClose} size="lg"
       footer={<>
         {f.id && <Allowed module="prix" action="modifier"><Button className="mr-auto" icon={f.archived_at ? <ArchiveRestore size={16} /> : <Archive size={16} />} onClick={() => archive.mutate(undefined, { onSuccess: onClose })}>{f.archived_at ? 'Restaurer' : 'Archiver'}</Button></Allowed>}
+        {f.id && vs !== 'rejete' && <Allowed module="prix" action="valider"><Button icon={<Ban size={16} />} loading={validate.isPending && validate.variables === 'rejete'} onClick={() => validate.mutate('rejete', { onSuccess: onClose })}>Rejeter</Button></Allowed>}
+        {f.id && vs !== 'valide' && <Allowed module="prix" action="valider"><Button icon={<CheckCircle2 size={16} />} loading={validate.isPending && validate.variables === 'valide'} onClick={() => validate.mutate('valide', { onSuccess: onClose })}>Valider</Button></Allowed>}
         <Button onClick={onClose}>Fermer</Button>
         <Allowed module="prix" action={f.id ? 'modifier' : 'creer'}><Button variant="primary" loading={save.isPending} disabled={!f.designation?.trim()} onClick={() => save.mutate(undefined, { onSuccess: onClose })}>Enregistrer</Button></Allowed>
       </>}>
+      {f.id && vs !== 'valide' && (
+        <Notice tone={vs === 'rejete' ? 'bad' : 'warn'} className="mb-4" title={vs === 'rejete' ? 'Ouvrage rejeté' : 'Ouvrage à vérifier'}>
+          {vs === 'rejete' ? 'Il n’est plus proposé dans les devis. Une personne ayant le droit « Valider » peut le rétablir.' : 'Importé d’un fichier : contrôlez la désignation, l’unité et le prix, puis validez-le (droit « Valider » sur la bibliothèque).'}
+        </Notice>
+      )}
+      {f.id && vs === 'valide' && initial.validated_at && <p className="mb-3 text-[12.5px] text-ok-600">Validé le {new Date(initial.validated_at).toLocaleString('fr-FR')}.</p>}
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Type">
           <Select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as PriceItem['kind'], category: e.target.value === 'ouvrage' ? 'Ouvrages composés' : f.category })}>
@@ -248,6 +284,24 @@ function PriceForm({ initial, items, suppliers, onClose }: { initial: Partial<Pr
         <Field label="Fournisseur"><Select value={f.supplier_id ?? ''} onChange={set('supplier_id')}><option value="">—</option>{suppliers.filter((s) => !s.archived_at).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></Field>
         <Field label="Conditions d’achat" className="sm:col-span-3"><Input value={f.purchase_conditions ?? ''} onChange={set('purchase_conditions')} placeholder="Ex. livraison incluse au-delà de 100 sacs" /></Field>
       </div>
+      <h3 className="mb-2 mt-5 text-[13px] font-bold uppercase tracking-wide text-muted">Bibliothèque des travaux</h3>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field label="Corps d’état"><Input value={f.trade ?? ''} onChange={set('trade')} placeholder="Ex. MACONNERIE - BETON" /></Field>
+        <Field label="Section du DQE" className="sm:col-span-2"><Input value={f.section ?? ''} onChange={set('section')} placeholder="Ex. Élévation" /></Field>
+        <Field label="Méthode de métré" className="sm:col-span-2" hint="Comment la quantité est mesurée"><Input value={f.metre_method ?? ''} onChange={set('metre_method')} placeholder="Ex. surface nette, ouvertures de plus de 1 m² déduites" /></Field>
+        <Field label="Formule" hint="Variables L, l, H, N…"><Input value={f.formula ?? ''} onChange={set('formula')} placeholder="Ex. L × H" /></Field>
+        <Field label="Observations" className="sm:col-span-3"><Textarea rows={2} value={f.observations ?? ''} onChange={set('observations')} /></Field>
+      </div>
+      {!!refs?.sources?.length && (
+        <div className="mt-4 rounded-lg border border-line p-3 text-[12.5px]">
+          <div className="mb-1 font-semibold text-navy-900">Origine dans le fichier (non modifiable)</div>
+          <p className="text-muted">Fichier « {refs.file} »{refs.sheet ? `, feuille ${refs.sheet}` : ''}</p>
+          <table className="mt-2 w-full">
+            <thead className="text-left text-muted"><tr><th className="py-1">Cellule</th><th>N°</th><th>Section</th><th className="text-right">Quantité</th><th className="text-right">Prix</th></tr></thead>
+            <tbody>{refs.sources.map((x, i) => <tr key={i} className="border-t border-line-2"><td className="py-1 tabular">{x.cell ?? '?'}</td><td>{x.number || '—'}</td><td>{x.section || '—'}</td><td className="tabular text-right">{x.quantity === null ? '—' : formatNumber(x.quantity, 2)}{x.quantityFormula ? <span className="ml-1 text-warn-600" title={`Formule : ${x.quantityFormula}`}>ƒ</span> : null}</td><td className="tabular text-right">{x.price === null ? 'sans prix' : formatNumber(x.price, 0)}</td></tr>)}</tbody>
+          </table>
+        </div>
+      )}
     </Modal>
   );
 }
@@ -354,3 +408,104 @@ function PriceImport({ onClose }: { onClose: () => void }) {
   );
 }
 
+
+const FLAG_TONE: Record<CandidateFlag, 'warn' | 'bad' | 'navy' | 'grey'> = {
+  prix_manquant: 'bad', prix_nul: 'bad', prix_divergents: 'warn', doublon_fusionne: 'navy', quantite_a_verifier: 'warn', deja_en_bibliotheque: 'grey', prix_different_en_bibliotheque: 'warn',
+};
+
+/**
+ * Construit la bibliothèque des travaux à partir d'un DQE Excel de l'entreprise : chaque ouvrage
+ * garde sa désignation, son unité, son prix, son corps d'état et ses cellules d'origine. Les
+ * anomalies du fichier sont montrées telles quelles, rien n'est corrigé ; tout reste « à vérifier ».
+ */
+function DqeLibraryImport({ items, onClose }: { items: PriceItem[]; onClose: () => void }) {
+  const { org } = useOrg();
+  const input = useRef<HTMLInputElement>(null);
+  const [plan, setPlan] = useState<LibraryImportPlan | null>(null);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [onlyIssues, setOnlyIssues] = useState(false);
+  const [allAlerts, setAllAlerts] = useState(false);
+  const read = async (file: File) => {
+    setError(null); setPlan(null); setBusy('Lecture du fichier…');
+    try {
+      const { analyzeFile } = await import('../../engine/dqp/import');
+      const { result } = await analyzeFile(file.name, new Uint8Array(await file.arrayBuffer()), (p) => setBusy(p.label));
+      const p = planLibraryImport(file.name, result, items);
+      if (!p.candidates.length) throw new Error('Aucun ouvrage reconnu dans ce fichier.');
+      setPlan(p);
+      setSel(new Set(p.candidates.filter((c) => c.selected).map((c) => c.code)));
+    } catch (e) { setError(errorMessage(e)); } finally { setBusy(null); }
+  };
+  const run = useAction(async () => {
+    const chosen = plan!.candidates.filter((c) => sel.has(c.code));
+    const imp = await insertRow<{ id: string }>('library_imports', { org_id: org!.id, file_name: plan!.fileName, stats: { ...plan!.stats, retenus: chosen.length, feuille: plan!.sheet }, alerts: plan!.fileAlerts });
+    const date = new Date().toISOString().slice(0, 10);
+    await insertRows('price_items', chosen.map((c) => candidateToRow(c, { orgId: org!.id, currency: org!.currency, country: org!.country ?? null, fileName: plan!.fileName, sheet: plan!.sheet, importId: imp.id, date })));
+    return chosen.length;
+  }, { success: (n) => `${n} ouvrage(s) ajouté(s) à la bibliothèque, « à vérifier ».`, invalidate: [['price_items'], ['library_imports']] });
+  const shown = plan ? plan.candidates.filter((c) => !onlyIssues || c.flags.some((f) => f !== 'doublon_fusionne')) : [];
+  const toggle = (code: string, on: boolean) => setSel((s) => { const n = new Set(s); if (on) n.add(code); else n.delete(code); return n; });
+  const st = plan?.stats;
+  return (
+    <Modal title="Importer un DQE dans la bibliothèque" onClose={onClose} size="xl"
+      footer={<><Button onClick={onClose}>Annuler</Button>{plan && <Allowed module="prix" action="creer"><Button variant="primary" loading={run.isPending} disabled={!sel.size} onClick={() => run.mutate(undefined, { onSuccess: onClose })}>Ajouter {sel.size} ouvrage(s)</Button></Allowed>}</>}>
+      <p className="text-[13.5px] text-ink-2">Choisissez un DQE Excel (.xlsx) de l’entreprise. PLANORA BTP reprend les désignations, unités, prix unitaires et corps d’état <b>tels qu’ils sont dans le fichier</b>, avec la cellule d’origine de chaque ligne. Les anomalies (prix manquants, formules cassées, doublons) sont signalées sans être corrigées, et chaque ouvrage importé reste <b>« à vérifier »</b> jusqu’à sa validation.</p>
+      <input ref={input} type="file" className="hidden" accept=".xlsx" aria-label="Fichier DQE" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void read(file); }} />
+      <Button className="mt-3" icon={<Upload size={16} />} loading={!!busy} onClick={() => input.current?.click()}>{plan ? 'Choisir un autre fichier' : 'Choisir le fichier DQE'}</Button>
+      {busy && <p className="mt-2 text-[12.5px] text-muted">{busy}</p>}
+      {error && <Notice tone="bad" className="mt-3">{error}</Notice>}
+      {plan && st && (
+        <div className="mt-4 space-y-3">
+          <div className="flex flex-wrap gap-2 text-[12.5px]">
+            <Badge tone="navy">{plan.fileName}{plan.sheet ? ` · ${plan.sheet}` : ''}</Badge>
+            <Badge tone="grey">{st.lignes} ligne(s) lue(s)</Badge>
+            <Badge tone="navy">{st.ouvrages} ouvrage(s)</Badge>
+            <Badge tone="grey">{plan.trades.length} corps d’état</Badge>
+            {st.prixManquants > 0 && <Badge tone="bad">{st.prixManquants} sans prix</Badge>}
+            {st.prixNuls > 0 && <Badge tone="bad">{st.prixNuls} à prix 0</Badge>}
+            {st.prixDivergents > 0 && <Badge tone="warn">{st.prixDivergents} à prix divergents</Badge>}
+            {st.doublonsFusionnes > 0 && <Badge tone="navy">{st.doublonsFusionnes} regroupé(s)</Badge>}
+            {st.dejaPresents > 0 && <Badge tone="grey">{st.dejaPresents} déjà en bibliothèque</Badge>}
+          </div>
+          {plan.fileAlerts.length > 0 && (
+            <Notice tone="warn" title={`${plan.fileAlerts.length} anomalie(s) dans le fichier (non corrigées)`}>
+              <ul className="list-disc space-y-0.5 pl-4">{(allAlerts ? plan.fileAlerts : plan.fileAlerts.slice(0, 6)).map((a, i) => <li key={i}>{a}</li>)}</ul>
+              {plan.fileAlerts.length > 6 && <button className="mt-1 font-semibold underline" onClick={() => setAllAlerts(!allAlerts)}>{allAlerts ? 'Réduire' : `Voir les ${plan.fileAlerts.length}`}</button>}
+            </Notice>
+          )}
+          <div className="flex flex-wrap items-center gap-4">
+            <Checkbox label="Seulement les ouvrages à anomalie" checked={onlyIssues} onChange={setOnlyIssues} />
+            <button className="text-[12.5px] font-semibold text-signal-600 underline" onClick={() => setSel(new Set(plan.candidates.filter((c) => !c.existingId).map((c) => c.code)))}>Tout sélectionner (hors déjà présents)</button>
+            <button className="text-[12.5px] font-semibold text-signal-600 underline" onClick={() => setSel(new Set())}>Tout désélectionner</button>
+          </div>
+          <div className="max-h-[48vh] overflow-auto rounded-lg border border-line">
+            <table className="w-full min-w-[860px] text-[12.5px]">
+              <thead className="sticky top-0 bg-navy-50 text-left text-[11.5px] uppercase text-muted">
+                <tr><th className="p-2" /><th className="p-2">Code</th><th className="p-2">Désignation</th><th className="p-2">Unité</th><th className="p-2 text-right">Prix unitaire</th><th className="p-2">Origine</th><th className="p-2">Contrôles</th></tr>
+              </thead>
+              <tbody>
+                {shown.map((c) => (
+                  <tr key={c.code} className="border-t border-line-2 align-top">
+                    <td className="p-2"><input type="checkbox" aria-label={`Retenir ${c.designation}`} className="h-4 w-4 accent-[var(--color-signal-500)]" checked={sel.has(c.code)} onChange={(e) => toggle(c.code, e.target.checked)} /></td>
+                    <td className="tabular p-2 text-muted">{c.code}</td>
+                    <td className="p-2"><div className="font-semibold text-navy-900">{c.designation}</div><div className="text-[11.5px] text-muted">{c.trade}{c.section ? ` › ${c.section}` : ''}</div></td>
+                    <td className="p-2">{c.unit || <span className="text-warn-600">—</span>}</td>
+                    <td className="tabular p-2 text-right font-semibold">{c.price === null ? <span className="text-bad-600">sans prix</span> : formatNumber(c.price, 0)}</td>
+                    <td className="tabular p-2 text-muted">{c.sources.map((x) => x.cell ?? '?').join(', ')}</td>
+                    <td className="p-2">
+                      <div className="flex flex-wrap gap-1">{c.flags.map((f) => <Badge key={f} tone={FLAG_TONE[f]}>{FLAG_LABEL[f]}</Badge>)}</div>
+                      {c.notes.map((n, i) => <div key={i} className="mt-1 text-[11.5px] text-ink-2">{n}</div>)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[12px] text-muted">Prix en {org?.currency ?? 'XOF'} hors taxes, tels que saisis dans le fichier. Les ouvrages de même désignation et même unité sont regroupés par corps d’état ; quand leurs prix diffèrent, chacun est gardé et signalé. Le N° d’origine et les cellules restent consultables sur la fiche de l’ouvrage.</p>
+        </div>
+      )}
+    </Modal>
+  );
+}

@@ -43,6 +43,14 @@ export async function insertRow<T>(table: string, values: Record<string, unknown
   return data as T;
 }
 
+/** Insertion groupée (une seule requête, tout ou rien). */
+export async function insertRows<T>(table: string, values: Record<string, unknown>[]): Promise<T[]> {
+  if (!values.length) return [];
+  const { data, error } = await supabase.from(table).insert(values).select();
+  if (error) throw new Error(errorMessage(error));
+  return (data ?? []) as T[];
+}
+
 export async function updateRow<T>(table: string, id: string, values: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.from(table).update(values).eq('id', id).select().maybeSingle();
   if (error) throw new Error(errorMessage(error));

@@ -11,6 +11,12 @@ Trois niveaux de tests automatisés, plus une recette manuelle.
   lignes incomplètes non comptées), déboursé sec (trois méthodes), CSV, doublons.
 - `tests/documents.test.ts` : le PDF et l’Excel d’un devis contiennent **exactement** les montants du moteur.
 - `tests/import.test.ts` : import d’un DQE Excel (lots, sous-parties, valeurs absentes signalées).
+- `tests/library-import.test.ts` : bibliothèque des travaux construite depuis un DQE Excel (classeur
+  synthétique, aucun fichier client) — corps d’état reconnus, désignations / unités / prix repris tels
+  quels, même ouvrage au même prix regroupé avec ses deux cellules d’origine, prix différents gardés et
+  signalés, occurrence sans prix rattachée avec une note, prix à 0 signalé, formule `#REF!` relevée,
+  codes par corps d’état (GO-001…) poursuivis après ceux de la bibliothèque, ouvrages déjà présents
+  désélectionnés, ligne insérée « à vérifier » avec sa source exacte.
 - `tests/plan.test.ts` : plans — calibration (le dessin change d’échelle, pas les épaisseurs ni les
   meubles), relecture robuste, détection d’une pièce entre les faces des murs (rectangle et pièce en L,
   zone ouverte refusée), aménagement proposé (dans la pièce, porte dégagée), rendu fidèle (noms,
@@ -32,7 +38,7 @@ Trois niveaux de tests automatisés, plus une recette manuelle.
 ## 2. Sécurité et règles de la base — `sh supabase/tests/run.sh`
 
 Applique les migrations sur un PostgreSQL vierge, avec un environnement qui imite Supabase
-(`supabase/tests/shim_supabase.sql`), puis exécute `supabase/tests/rls_test.sql` : 187 contrôles, parmi lesquels :
+(`supabase/tests/shim_supabase.sql`), puis exécute `supabase/tests/rls_test.sql` : 192 contrôles, parmi lesquels :
 isolation entre entreprises (lecture, écriture, fichiers, journal), permissions par rôle et matrice
 modifiable, invitations, limites d’offre, abonnement échu en lecture seule, versions verrouillées, métré
 approuvé figé, historique des prix, demandes d’abonnement, administration sans accès au contenu,
@@ -43,7 +49,9 @@ finances (totaux recalculés par le serveur, numérotation FAC / AVO à l’émi
 paiement limité au reste dû), achats et stocks (commande validée figée, réception partielle, stock négatif
 refusé, transfert, inventaire, isolation), planning (dépendances sans boucle, validation après « terminé »,
 rapport journalier toujours créé en brouillon, un par jour, photos rangées dans l’entreprise, rapport validé
-figé, réserve validée seulement une fois levée, isolation, module hors offre refusé).
+figé, réserve validée seulement une fois levée, isolation, module hors offre refusé), bibliothèque des
+travaux (ouvrage importé « à vérifier », source d’origine non modifiable, validation réservée au droit
+« Valider » et tracée, journal des imports non modifiable, isolation).
 
 ```bash
 PGHOST=/chemin/socket PGPORT=5432 sh supabase/tests/run.sh   # utilisateur « postgres »
@@ -53,7 +61,7 @@ PGHOST=/chemin/socket PGPORT=5432 sh supabase/tests/run.sh   # utilisateur « po
 
 Pilote un vrai navigateur sur une pile locale (`scripts/local-stack/`) : PostgreSQL avec les migrations,
 PostgREST, et une passerelle qui joue l’authentification, le stockage et la fonction serveur de Supabase.
-61 étapes : inscription, confirmation, entreprise, client, doublon, projet et lots, article et ouvrage composé,
+62 étapes : inscription, confirmation, entreprise, client, doublon, projet et lots, article et ouvrage composé,
 métré, DQE, devis, PDF, Excel, validation, nouvelle version, invitation d’un métreur sur téléphone,
 permissions, demande d’abonnement (offre Professionnelle), activation par l’administration ; facture
 d’acompte depuis le devis, émission, paiement partiel, PDF, dépense, onglet Finances du chantier ; dépôts,
@@ -66,7 +74,8 @@ fournisseur, tableau de bord complet (budget du projet repris) ; notifications (
 insuffisant), préférences, assistance avec réponse de la plateforme, historique d’abonnement ; puis plans :
 dessin (murs, cloison à la longueur saisie, porte, fenêtre), détection des pièces (26,18 m² et 32,98 m²),
 aménagement, rendu fidèle (PDF, DXF), rendu IA, métré tiré du plan, import d’un plan scanné, calibration,
-détection sur les traits de l’image, éditeur sur téléphone ; enfin tableau de bord et journal.
+détection sur les traits de l’image, éditeur sur téléphone ; tableau de bord et journal ; enfin import d’un DQE
+Excel dans la bibliothèque (prix manquant et prix divergents signalés, cellule d’origine affichée, ouvrage validé).
 
 Le rendu IA y utilise un **fournisseur de test** (`PLANORA_TEST_AI=1`) qui renvoie l’image d’entrée telle
 quelle : il vérifie tout le parcours (quota, stockage, état, surcouche, mention) sans service payant.
@@ -140,6 +149,6 @@ installation, sans serveur et sans Internet (Chrome, Edge ou Firefox récents) :
 
 Vérifications :
 - `node scripts/demo/serve-backend.mjs` expose le même serveur interne en HTTP (port 54320) : la recette
-  complète (`scripts/e2e.mjs`, 61 étapes) y passe entièrement ;
+  complète (`scripts/e2e.mjs`, 62 étapes) y passe entièrement ;
 - `node scripts/demo/smoke.mjs dist-demo/index.html` ouvre le fichier depuis le disque : connexion,
   écriture, conservation après rechargement, second onglet refusé, devis et PDF, administration.

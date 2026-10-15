@@ -9,7 +9,7 @@ export function migrateProject(raw: unknown): Project {
   const p = raw as Record<string, unknown> & { schema?: number };
   if (!p || typeof p !== 'object' || !Array.isArray(p.lots) || !p.info) throw new Error('format de projet inconnu');
   if (typeof p.schema !== 'number' || p.schema > CURRENT_SCHEMA) {
-    throw new Error(`projet enregistré par une version plus récente de DQP (schéma ${p.schema})`);
+    throw new Error(`projet enregistré par une version plus récente de PLANORA BTP (schéma ${p.schema})`);
   }
   if (p.schema === 1) {
     // Schéma 2 : éléments du bâtiment (plans) et résolutions des différences entre sources.

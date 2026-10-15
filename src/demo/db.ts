@@ -6,8 +6,11 @@ import { PGlite } from '@electric-sql/pglite';
 // Fourni par le greffon Vite « demoAssets » (vite.config.ts) au moment de la construction.
 import assets from 'virtual:planora-demo-assets';
 
-const STORE = 'idb://planora-btp-demo';
-const FLAG = 'planora-demo-base-v1';
+// Le nom change à chaque nouvelle structure de base : une ancienne démonstration ouverte dans ce
+// navigateur n'est pas réutilisée avec une structure qui ne lui correspond plus.
+const DB_NAME = 'planora-btp-demo-v2';
+const STORE = `idb://${DB_NAME}`;
+const FLAG = 'planora-demo-base-v2';
 
 const bytes = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 async function gunzip(b64: string): Promise<ArrayBuffer> {
@@ -26,6 +29,8 @@ async function open(): Promise<PGlite> {
   const extensions = { pgcrypto: { name: 'pgcrypto', setup: async () => ({ bundlePath: pgcryptoUrl }) } };
   const seed = () => new Blob([bytes(assets.seed)], { type: 'application/gzip' });
 
+  // Démonstration précédente (ancienne structure) : libère la place qu'elle occupait.
+  try { localStorage.removeItem('planora-demo-base-v1'); indexedDB.deleteDatabase('/pglite/planora-btp-demo'); } catch { /* stockage indisponible */ }
   let initialized = false;
   try { initialized = localStorage.getItem(FLAG) === '1'; } catch { /* stockage indisponible */ }
   try {
@@ -54,7 +59,7 @@ export async function resetDemo() {
   try { localStorage.removeItem(FLAG); } catch { /* stockage indisponible */ }
   try { (await getDemoDb()).close(); } catch { /* déjà fermée */ }
   await new Promise<void>((resolve) => {
-    const r = indexedDB.deleteDatabase('/pglite/planora-btp-demo');
+    const r = indexedDB.deleteDatabase(`/pglite/${DB_NAME}`);
     r.onsuccess = r.onerror = r.onblocked = () => resolve();
   });
   location.reload();

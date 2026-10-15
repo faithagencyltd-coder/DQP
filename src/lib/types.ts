@@ -56,6 +56,10 @@ export interface PriceItem {
   unit: string; purchase_price: number | null; sale_price: number | null; currency: string; supplier_id: string | null;
   country: string | null; city: string | null; price_date: string | null; source: string | null; purchase_conditions: string | null;
   loss_pct: number | null; breakdown: CostBreakdown | null; archived_at: string | null; updated_at: string;
+  trade?: string | null; section?: string | null; metre_method?: string | null; formula?: string | null; observations?: string | null;
+  validation_status?: 'a_verifier' | 'valide' | 'rejete'; validated_by?: string | null; validated_at?: string | null;
+  source_ref?: { file?: string; sheet?: string | null; sources?: { cell: string | null; number: string; section: string; quantity: number | null; price: number | null; quantityFormula?: string }[] } | null;
+  import_id?: string | null;
 }
 
 export interface MetreDoc {
