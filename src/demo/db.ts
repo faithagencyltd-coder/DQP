@@ -8,9 +8,10 @@ import assets from 'virtual:planora-demo-assets';
 
 // Le nom change à chaque nouvelle structure de base : une ancienne démonstration ouverte dans ce
 // navigateur n'est pas réutilisée avec une structure qui ne lui correspond plus.
-const DB_NAME = 'planora-btp-demo-v2';
+const VERSION = 3;
+const DB_NAME = `planora-btp-demo-v${VERSION}`;
 const STORE = `idb://${DB_NAME}`;
-const FLAG = 'planora-demo-base-v2';
+const FLAG = `planora-demo-base-v${VERSION}`;
 
 const bytes = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 async function gunzip(b64: string): Promise<ArrayBuffer> {
@@ -29,8 +30,13 @@ async function open(): Promise<PGlite> {
   const extensions = { pgcrypto: { name: 'pgcrypto', setup: async () => ({ bundlePath: pgcryptoUrl }) } };
   const seed = () => new Blob([bytes(assets.seed)], { type: 'application/gzip' });
 
-  // Démonstration précédente (ancienne structure) : libère la place qu'elle occupait.
-  try { localStorage.removeItem('planora-demo-base-v1'); indexedDB.deleteDatabase('/pglite/planora-btp-demo'); } catch { /* stockage indisponible */ }
+  // Démonstrations précédentes (anciennes structures) : libère la place qu'elles occupaient.
+  try {
+    for (let v = 1; v < VERSION; v++) {
+      localStorage.removeItem(`planora-demo-base-v${v}`);
+      indexedDB.deleteDatabase(v === 1 ? '/pglite/planora-btp-demo' : `/pglite/planora-btp-demo-v${v}`);
+    }
+  } catch { /* stockage indisponible */ }
   let initialized = false;
   try { initialized = localStorage.getItem(FLAG) === '1'; } catch { /* stockage indisponible */ }
   try {

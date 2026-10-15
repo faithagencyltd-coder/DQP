@@ -5,10 +5,11 @@ import { insertRow, useAction, useRows } from '../../lib/api';
 import { errorMessage } from '../../lib/errors';
 import { QUOTE_STATUS, fmtDate } from '../../lib/labels';
 import { useOrg } from '../../lib/session';
-import type { Contact, MetreDoc, Project, ProjectLot, Quote } from '../../lib/types';
+import type { Contact, MetreDoc, PriceItem, Project, ProjectLot, Quote } from '../../lib/types';
 import { cloneBody, newLot, type DocBody } from '../../engine/dqe';
 import { formatMoney } from '../../engine/money';
 import { importDqeFile, type DqeImportReport } from '../../engine/import-dqe';
+import { libraryToBody, libraryTrades } from '../../engine/library-dqe';
 import { Badge, Button, Card, Checkbox, DataTable, EmptyState, Field, Input, Modal, Notice, PageHeader, SearchInput, Select, Spinner, Tabs } from '../../ui';
 import { Allowed } from '../../ui/guard';
 
@@ -63,7 +64,7 @@ export function QuotesPage({ kind }: { kind: 'dqe' | 'devis' }) {
   );
 }
 
-type Source = 'manuel' | 'dqe' | 'devis' | 'metre' | 'import';
+type Source = 'manuel' | 'dqe' | 'devis' | 'metre' | 'import' | 'bibliotheque';
 
 function NewQuote({ kind, projectId, all, onClose }: { kind: 'dqe' | 'bpu' | 'devis'; projectId: string; all: Quote[]; onClose: () => void }) {
   const { org } = useOrg();
@@ -82,11 +83,17 @@ function NewQuote({ kind, projectId, all, onClose }: { kind: 'dqe' | 'bpu' | 'de
   const [importing, setImporting] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const lots = useRows<ProjectLot>('project_lots', org?.id, { filter: (q) => q.eq('project_id', pid), order: ['sort'], key: [pid], enabled: !!pid });
+  const library = useRows<PriceItem>('price_items', org?.id, { order: ['designation'], enabled: source === 'bibliotheque' });
+  const [trades, setTrades] = useState<string[]>([]);
+  const [includeToVerify, setIncludeToVerify] = useState(true);
+  const [withSections, setWithSections] = useState(true);
+  const tradeList = useMemo(() => libraryTrades(library.data ?? []), [library.data]);
+  const libPlan = useMemo(() => (source === 'bibliotheque' && trades.length ? libraryToBody(library.data ?? [], { trades, includeToVerify, withSections, currency: org?.currency ?? 'XOF' }) : null), [source, library.data, trades, includeToVerify, withSections, org?.currency]);
 
   const sources: [Source, string][] = kind === 'devis'
     ? [['manuel', 'Saisie manuelle'], ['dqe', 'À partir d’un DQE'], ['devis', 'À partir d’un devis existant ou d’un modèle'], ['metre', 'À partir d’un métré']]
-    : kind === 'dqe' ? [['manuel', 'Saisie manuelle'], ['import', 'Importer un DQE Excel / CSV'], ['dqe', 'À partir d’un DQE existant'], ['metre', 'À partir d’un métré']]
-    : [['manuel', 'Saisie manuelle'], ['dqe', 'À partir d’un DQE (reprend les ouvrages et leurs prix)']];
+    : kind === 'dqe' ? [['manuel', 'Saisie manuelle'], ['import', 'Importer un DQE Excel / CSV'], ['dqe', 'À partir d’un DQE existant'], ['metre', 'À partir d’un métré'], ['bibliotheque', 'À partir de la bibliothèque des travaux']]
+    : [['manuel', 'Saisie manuelle'], ['dqe', 'À partir d’un DQE (reprend les ouvrages et leurs prix)'], ['bibliotheque', 'À partir de la bibliothèque des travaux']];
   const fromList = source === 'dqe' ? all.filter((x) => x.kind === 'dqe') : source === 'devis' ? all.filter((x) => x.kind === 'devis') : [];
 
   const create = useAction(async () => {
@@ -97,6 +104,8 @@ function NewQuote({ kind, projectId, all, onClose }: { kind: 'dqe' | 'bpu' | 'de
       body = { lots: withLots && lots.data?.length ? lots.data.map((l, i) => newLot(l.name, i)) : [newLot('Travaux', 0)] };
     } else if (source === 'import') {
       body = imported!.body;
+    } else if (source === 'bibliotheque') {
+      body = libPlan!.body;
     } else if (source === 'dqe' || source === 'devis') {
       const { supabase } = await import('../../lib/supabase');
       const { data, error } = await supabase.from('quotes').select('body, settings').eq('id', from).single();
@@ -143,7 +152,7 @@ function NewQuote({ kind, projectId, all, onClose }: { kind: 'dqe' | 'bpu' | 'de
     );
   }
 
-  const ready = title.trim() && (source === 'manuel' || (source === 'import' ? !!imported : !!from));
+  const ready = title.trim() && (source === 'manuel' || (source === 'import' ? !!imported : source === 'bibliotheque' ? !!libPlan?.stats.ouvrages : !!from));
   return (
     <Modal title={kind === 'devis' ? 'Nouveau devis' : kind === 'dqe' ? 'Nouveau DQE' : 'Nouveau BPU'} onClose={onClose} wide
       footer={<><Button onClick={onClose}>Annuler</Button><Button variant="primary" disabled={!ready} loading={create.isPending} onClick={() => create.mutate(undefined, { onSuccess: (x) => nav(`/app/documents-chiffres/${x.id}`) })}>Créer</Button></>}>
@@ -177,6 +186,37 @@ function NewQuote({ kind, projectId, all, onClose }: { kind: 'dqe' | 'bpu' | 'de
                 {imported.alerts.slice(0, 6).map((a, i) => <div key={i}>• {a}</div>)}
                 <div className="mt-1 text-[12px]">Les totaux seront recalculés par PLANORA à partir des lignes ; les formules du fichier sont gardées en note pour la traçabilité.</div>
               </Notice>
+            )}
+          </div>
+        )}
+        {source === 'bibliotheque' && (
+          <div className="sm:col-span-2">
+            {library.isLoading ? <Spinner /> : !tradeList.length ? <Notice tone="warn">La bibliothèque ne contient aucun ouvrage utilisable. Importez un DQE de l’entreprise ou saisissez des ouvrages.</Notice> : (
+              <>
+                <div className="mb-2 flex items-center justify-between text-[13px]">
+                  <span className="font-semibold text-navy-900">Corps d’état à reprendre (un lot chacun)</span>
+                  <button className="font-semibold text-signal-600 underline" onClick={() => setTrades(trades.length === tradeList.length ? [] : tradeList.map((t) => t.name))}>{trades.length === tradeList.length ? 'Tout désélectionner' : 'Tout sélectionner'}</button>
+                </div>
+                <div className="grid max-h-[30vh] gap-1 overflow-y-auto rounded-lg border border-line p-2 sm:grid-cols-2">
+                  {tradeList.map((t) => (
+                    <Checkbox key={t.name} label={<>{t.name} <span className="text-muted">({t.count}{t.toVerify ? `, dont ${t.toVerify} à vérifier` : ''})</span></>} checked={trades.includes(t.name)} onChange={(on) => setTrades(on ? [...trades, t.name] : trades.filter((x) => x !== t.name))} />
+                  ))}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-4">
+                  <Checkbox label="Inclure les ouvrages « à vérifier » (signalés sur leur ligne)" checked={includeToVerify} onChange={setIncludeToVerify} />
+                  <Checkbox label="Reprendre les sections du DQE d’origine" checked={withSections} onChange={setWithSections} />
+                </div>
+                {libPlan && (
+                  <Notice tone={libPlan.stats.aVerifier || libPlan.stats.sansPrix ? 'warn' : 'ok'} className="mt-3" title={`${libPlan.body.lots.length} lot(s), ${libPlan.stats.ouvrages} ouvrage(s)`}>
+                    <div>{libPlan.stats.chiffres} ouvrage(s) chiffré(s) avec le prix de la bibliothèque.</div>
+                    {libPlan.stats.sansPrix > 0 && <div>{libPlan.stats.sansPrix} ouvrage(s) sans prix, laissé(s) « à compléter ».</div>}
+                    {libPlan.stats.autreDevise > 0 && <div>{libPlan.stats.autreDevise} prix dans une autre devise, non repris.</div>}
+                    {libPlan.stats.aVerifier > 0 && <div>{libPlan.stats.aVerifier} prix « à vérifier », signalé(s) sur leur ligne.</div>}
+                    {libPlan.stats.ecartes > 0 && <div>{libPlan.stats.ecartes} ouvrage(s) « à vérifier » écarté(s).</div>}
+                    {kind === 'dqe' && <div className="mt-1 text-[12px]">Les quantités restent à saisir : aucune quantité n’est reprise d’un autre projet.</div>}
+                  </Notice>
+                )}
+              </>
             )}
           </div>
         )}

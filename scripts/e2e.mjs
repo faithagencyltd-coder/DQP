@@ -804,6 +804,22 @@ try {
   await shot(page, '25-dqe-depuis-bibliotheque');
   ok('DQE généré : prix repris de la bibliothèque (12 × 3 500 = 42 000), quantité estimée et prix « à vérifier » signalés avant validation');
 
+  // ------------------------------------------------------------ DQE type directement depuis la bibliothèque
+  await nav(page, 'DQE et BPU');
+  await page.getByRole('button', { name: 'Nouveau DQE', exact: true }).click();
+  await page.getByLabel('À partir de la bibliothèque des travaux').check();
+  await page.getByLabel(/^ELECTRICITE \(3, dont 2 à vérifier\)/).check();
+  const nq = page.getByRole('dialog');
+  await nq.getByText('1 lot(s), 3 ouvrage(s)').waitFor();
+  await nq.getByText('2 ouvrage(s) chiffré(s) avec le prix de la bibliothèque.').waitFor();
+  await nq.getByText('1 ouvrage(s) sans prix, laissé(s) « à compléter ».').waitFor();
+  await field(page, 'Titre').fill('DQE type électricité');
+  await shot(page, '26-dqe-type-bibliotheque');
+  await nq.getByRole('button', { name: 'Créer', exact: true }).click();
+  await page.getByText('À revoir : 2 prix « à vérifier ».').waitFor();
+  await page.getByText('3 ligne(s) sans quantité ou sans prix ne sont pas comptées.').waitFor();
+  ok('DQE type créé depuis la bibliothèque (lot ELECTRICITE, prix repris, quantités à saisir, prix « à vérifier » signalés)');
+
   console.log('RECETTE RÉUSSIE');
 } catch (e) {
   console.error('ÉCHEC :', e.message);

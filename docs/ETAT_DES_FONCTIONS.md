@@ -104,6 +104,7 @@ Détail du module, des coûts et des limites : `docs/RENDU_PLANS.md`.
 | Origine de chaque quantité : calculée, reconnue sur plan, estimée, saisie (lignes tirées d’un plan : « reconnue sur plan ») ; visible dans le métré, le récapitulatif, le PDF et l’Excel | ✅ Terminé | `tests/metre-library.test.ts`, recette 63 |
 | DQE généré depuis le métré avec les prix de la bibliothèque (ouvrage commun au groupe, non rejeté, avec prix, même devise), source du prix tracée | ✅ Terminé | recette 64 |
 | Avant validation d’un DQE / devis : quantités estimées et prix « à vérifier » signalés | ✅ Terminé | `tests/metre-library.test.ts`, recette 64 |
+| DQE ou BPU type créé directement depuis la bibliothèque : choix des corps d’état (un lot chacun), ordre et sections du DQE d’origine, prix et source repris, quantités laissées à saisir, ouvrages « à vérifier » inclus (signalés) ou écartés, prix d’une autre devise non repris | ✅ Terminé | `tests/library-dqe.test.ts`, recette 65, essai local sur le DQE SENOU (117 ouvrages, 7 lots) |
 | Contrôle bloquant côté serveur des prix « à vérifier » à la validation | ⚠️ **À venir** | aujourd’hui un avertissement, la validation reste possible |
 
 ## Autres fonctions livrées

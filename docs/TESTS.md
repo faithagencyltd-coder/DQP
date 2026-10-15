@@ -21,6 +21,9 @@ Trois niveaux de tests automatisés, plus une recette manuelle.
   parenthèse manquante refusées), formule standard selon l’unité, ligne de métré depuis un ouvrage
   (dimensions non devinées, 2 × (4 + 3) × 2,8 = 39,20), origine des quantités (calculée, saisie,
   reconnue sur plan, estimée), regroupement (origines, ouvrage commun), points à revoir avant validation.
+- `tests/library-dqe.test.ts` : DQE type depuis la bibliothèque — corps d’état dans l’ordre du DQE d’origine
+  (rejetés et archivés exclus), un lot par corps d’état, sections reprises, quantités jamais reprises (total 0,
+  lignes incomplètes signalées), prix « à vérifier » tracé, prix d’une autre devise non repris, options.
 - `tests/plan.test.ts` : plans — calibration (le dessin change d’échelle, pas les épaisseurs ni les
   meubles), relecture robuste, détection d’une pièce entre les faces des murs (rectangle et pièce en L,
   zone ouverte refusée), aménagement proposé (dans la pièce, porte dégagée), rendu fidèle (noms,
@@ -65,7 +68,7 @@ PGHOST=/chemin/socket PGPORT=5432 sh supabase/tests/run.sh   # utilisateur « po
 
 Pilote un vrai navigateur sur une pile locale (`scripts/local-stack/`) : PostgreSQL avec les migrations,
 PostgREST, et une passerelle qui joue l’authentification, le stockage et la fonction serveur de Supabase.
-64 étapes : inscription, confirmation, entreprise, client, doublon, projet et lots, article et ouvrage composé,
+65 étapes : inscription, confirmation, entreprise, client, doublon, projet et lots, article et ouvrage composé,
 métré, DQE, devis, PDF, Excel, validation, nouvelle version, invitation d’un métreur sur téléphone,
 permissions, demande d’abonnement (offre Professionnelle), activation par l’administration ; facture
 d’acompte depuis le devis, émission, paiement partiel, PDF, dépense, onglet Finances du chantier ; dépôts,
@@ -81,7 +84,7 @@ aménagement, rendu fidèle (PDF, DXF), rendu IA, métré tiré du plan, import 
 détection sur les traits de l’image, éditeur sur téléphone ; tableau de bord et journal ; enfin import d’un DQE
 Excel dans la bibliothèque (prix manquant et prix divergents signalés, cellule d’origine affichée, ouvrage validé),
 métré créé depuis cet ouvrage avec une quantité « estimée », DQE généré avec le prix de la bibliothèque
-(12 × 3 500 = 42 000) et points à revoir signalés.
+(12 × 3 500 = 42 000) et points à revoir signalés, puis DQE type créé directement depuis la bibliothèque.
 
 Le rendu IA y utilise un **fournisseur de test** (`PLANORA_TEST_AI=1`) qui renvoie l’image d’entrée telle
 quelle : il vérifie tout le parcours (quota, stockage, état, surcouche, mention) sans service payant.
@@ -155,6 +158,6 @@ installation, sans serveur et sans Internet (Chrome, Edge ou Firefox récents) :
 
 Vérifications :
 - `node scripts/demo/serve-backend.mjs` expose le même serveur interne en HTTP (port 54320) : la recette
-  complète (`scripts/e2e.mjs`, 64 étapes) y passe entièrement ;
+  complète (`scripts/e2e.mjs`, 65 étapes) y passe entièrement ;
 - `node scripts/demo/smoke.mjs dist-demo/index.html` ouvre le fichier depuis le disque : connexion,
   écriture, conservation après rechargement, second onglet refusé, devis et PDF, administration.

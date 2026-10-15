@@ -86,7 +86,7 @@ importés « à vérifier ».
 | 2. Bibliothèque et métré | import d’un DQE Excel dans la bibliothèque, traçabilité (fichier, feuille, cellule), anomalies, statut de validation, fiche d’ouvrage (corps d’état, méthode de métré, formule) | ✅ fait (import, validation) |
 | 2 (suite) | ligne de métré depuis un ouvrage (formule de l’ouvrage appliquée) ; origine de chaque quantité : *calculée*, *reconnue sur plan*, *estimée*, *saisie* | ✅ fait |
 | 3. DQE, BPU, documents | DQE généré depuis le métré avec les prix de la bibliothèque, source tracée ; quantités estimées et prix « à vérifier » signalés avant validation | ✅ fait (contrôle bloquant côté serveur : à venir) |
-| 3 (suite) | DQE type par corps d’état directement depuis la bibliothèque (sans métré), sections du DQE d’origine reprises | à faire |
+| 3 (suite) | DQE / BPU type par corps d’état directement depuis la bibliothèque (sans métré), sections et ordre du DQE d’origine repris | ✅ fait |
 | 4. Plans techniques | électricité, plomberie, CVC, aération, carrelage, peinture : symboles, comptages et longueurs **tracés ou confirmés par l’utilisateur** ; aucune reconnaissance automatique présentée comme fiable sans test | à faire |
 | 5. Assistants par corps d’état | listes de contrôle et calculs par métier à partir de la bibliothèque validée ; IA facultative et désactivée par défaut | à faire |
 | 6. Production | projet Supabase (créé par vous), déploiement, service de courriel, prestataire de paiement, sauvegardes, supervision | en attente de vos choix |
