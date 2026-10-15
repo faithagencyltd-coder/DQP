@@ -100,8 +100,11 @@ Détail du module, des coûts et des limites : `docs/RENDU_PLANS.md`.
 | Statut de validation (à vérifier / validé / rejeté), validation réservée au droit « Valider », tracée (qui, quand) ; source d’origine non modifiable ; journal des imports | ✅ Terminé | contrôles SQL, recette 62 |
 | Fiche d’ouvrage : corps d’état, section, méthode de métré, formule, observations ; filtres par corps d’état et statut ; export CSV avec ces colonnes | ✅ Terminé | recette 62 (filtre, fiche) |
 | Ouvrages « à vérifier » proposés dans les devis avec la mention « à vérifier » ; ouvrages rejetés exclus | ✅ Terminé | revue de code (pas de test automatisé dédié) |
-| Méthode de métré et formule **utilisées par le moteur de métré** | ⚠️ **À venir** | champs enregistrés et affichés ; le moteur ne les applique pas encore (phase 2, suite) |
-| Génération d’un DQE à partir de la bibliothèque des travaux | ⚠️ **À venir** | phase 3 |
+| Ligne de métré créée depuis un ouvrage de la bibliothèque : désignation, unité, corps d’état, formule paramétrable de l’ouvrage (vérifiée ; formule standard de l’unité sinon, avec signalement), méthode de métré reprise ; dimensions jamais pré-remplies | ✅ Terminé | `tests/metre-library.test.ts`, recette 63 |
+| Origine de chaque quantité : calculée, reconnue sur plan, estimée, saisie (lignes tirées d’un plan : « reconnue sur plan ») ; visible dans le métré, le récapitulatif, le PDF et l’Excel | ✅ Terminé | `tests/metre-library.test.ts`, recette 63 |
+| DQE généré depuis le métré avec les prix de la bibliothèque (ouvrage commun au groupe, non rejeté, avec prix, même devise), source du prix tracée | ✅ Terminé | recette 64 |
+| Avant validation d’un DQE / devis : quantités estimées et prix « à vérifier » signalés | ✅ Terminé | `tests/metre-library.test.ts`, recette 64 |
+| Contrôle bloquant côté serveur des prix « à vérifier » à la validation | ⚠️ **À venir** | aujourd’hui un avertissement, la validation reste possible |
 
 ## Autres fonctions livrées
 

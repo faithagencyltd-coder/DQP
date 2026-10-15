@@ -20,8 +20,10 @@ export interface DocLine {
   unitPrice: number | null;
   note?: string;
   /** Origine de la quantité et du prix (traçabilité). */
-  qtySource?: { kind: 'metre' | 'saisie' | 'import' | 'ia'; label?: string; id?: string; verified?: boolean };
-  priceSource?: { kind: 'bpu' | 'bibliotheque' | 'saisie' | 'import' | 'deboursé'; label?: string; id?: string };
+  /** estimated : quantité estimée (hypothèse), à confirmer avant validation. */
+  qtySource?: { kind: 'metre' | 'saisie' | 'import' | 'ia'; label?: string; id?: string; verified?: boolean; estimated?: boolean };
+  /** toVerify : prix d'un ouvrage de bibliothèque encore « à vérifier ». */
+  priceSource?: { kind: 'bpu' | 'bibliotheque' | 'saisie' | 'import' | 'deboursé'; label?: string; id?: string; toVerify?: boolean };
 }
 
 export interface DocLot {
@@ -193,4 +195,10 @@ export function cloneBody(body: DocBody): DocBody {
 
 export function quantityTotal(body: DocBody): number {
   return roundTo(body.lots.reduce((s, l) => s + l.lines.reduce((a, x) => a + (x.qty ?? 0), 0), 0), 3);
+}
+
+/** Points à revoir avant de valider un document : quantités estimées et prix « à vérifier ». */
+export function reviewPoints(body: DocBody): { estimated: number; toVerify: number } {
+  const lines = body.lots.flatMap((l) => l.lines).filter((l) => l.kind === 'ouvrage');
+  return { estimated: lines.filter((l) => l.qtySource?.estimated).length, toVerify: lines.filter((l) => l.priceSource?.toVerify).length };
 }

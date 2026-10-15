@@ -11,6 +11,7 @@ import { mapHeaders, parseCsv, toCsv } from '../../engine/csv';
 import { COST_KIND_LABEL, computeBreakdown, DEFAULT_BREAKDOWN, type CostBreakdown, type CostKind } from '../../engine/debourse';
 import { formatMoney, formatNumber, parseNumber } from '../../engine/money';
 import { UNITS } from '../../engine/units';
+import { checkFormula } from '../../engine/metre';
 import { Badge, Button, Card, Checkbox, Confirm, DataTable, EmptyState, Field, Input, Modal, Notice, PageHeader, SearchInput, Select, Spinner, Tabs, Textarea, useToast } from '../../ui';
 import { Allowed } from '../../ui/guard';
 
@@ -247,7 +248,7 @@ function PriceForm({ initial, items, suppliers, onClose }: { initial: Partial<Pr
         {f.id && vs !== 'rejete' && <Allowed module="prix" action="valider"><Button icon={<Ban size={16} />} loading={validate.isPending && validate.variables === 'rejete'} onClick={() => validate.mutate('rejete', { onSuccess: onClose })}>Rejeter</Button></Allowed>}
         {f.id && vs !== 'valide' && <Allowed module="prix" action="valider"><Button icon={<CheckCircle2 size={16} />} loading={validate.isPending && validate.variables === 'valide'} onClick={() => validate.mutate('valide', { onSuccess: onClose })}>Valider</Button></Allowed>}
         <Button onClick={onClose}>Fermer</Button>
-        <Allowed module="prix" action={f.id ? 'modifier' : 'creer'}><Button variant="primary" loading={save.isPending} disabled={!f.designation?.trim()} onClick={() => save.mutate(undefined, { onSuccess: onClose })}>Enregistrer</Button></Allowed>
+        <Allowed module="prix" action={f.id ? 'modifier' : 'creer'}><Button variant="primary" loading={save.isPending} disabled={!f.designation?.trim() || (!!f.formula?.trim() && checkFormula(f.formula) !== null)} onClick={() => save.mutate(undefined, { onSuccess: onClose })}>Enregistrer</Button></Allowed>
       </>}>
       {f.id && vs !== 'valide' && (
         <Notice tone={vs === 'rejete' ? 'bad' : 'warn'} className="mb-4" title={vs === 'rejete' ? 'Ouvrage rejeté' : 'Ouvrage à vérifier'}>
@@ -289,7 +290,7 @@ function PriceForm({ initial, items, suppliers, onClose }: { initial: Partial<Pr
         <Field label="Corps d’état"><Input value={f.trade ?? ''} onChange={set('trade')} placeholder="Ex. MACONNERIE - BETON" /></Field>
         <Field label="Section du DQE" className="sm:col-span-2"><Input value={f.section ?? ''} onChange={set('section')} placeholder="Ex. Élévation" /></Field>
         <Field label="Méthode de métré" className="sm:col-span-2" hint="Comment la quantité est mesurée"><Input value={f.metre_method ?? ''} onChange={set('metre_method')} placeholder="Ex. surface nette, ouvertures de plus de 1 m² déduites" /></Field>
-        <Field label="Formule" hint="Variables L, l, H, N…"><Input value={f.formula ?? ''} onChange={set('formula')} placeholder="Ex. L × H" /></Field>
+        <Field label="Formule" hint="Variables L, l, H, N" error={f.formula?.trim() ? checkFormula(f.formula) ?? undefined : undefined}><Input value={f.formula ?? ''} onChange={set('formula')} placeholder="Ex. L × H" /></Field>
         <Field label="Observations" className="sm:col-span-3"><Textarea rows={2} value={f.observations ?? ''} onChange={set('observations')} /></Field>
       </div>
       {!!refs?.sources?.length && (

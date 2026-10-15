@@ -776,6 +776,34 @@ try {
     ok('bibliothèque des travaux : DQE Excel importé (prix manquant et prix divergents signalés, cellules d’origine), ouvrage validé');
   }
 
+  // ------------------------------------------------------------ métré depuis la bibliothèque, DQE chiffré
+  await nav(page, 'Métrés et quantitatifs');
+  await page.getByRole('button', { name: 'Nouveau métré', exact: true }).click();
+  await field(page, 'Titre').fill('Métré électricité');
+  await page.getByLabel('Projet').selectOption({ index: 1 });
+  await page.getByRole('button', { name: 'Créer', exact: true }).click();
+  await page.getByRole('button', { name: 'Depuis la bibliothèque', exact: true }).click();
+  await page.getByRole('dialog').getByPlaceholder('Code, désignation, corps d’état…').fill('prise');
+  await page.getByRole('dialog').getByRole('button', { name: /EL-001/ }).click();
+  await page.getByText('Ouvrage de la bibliothèque').waitFor();
+  await page.getByLabel('nombre').first().fill('12');
+  await page.getByLabel('nombre').first().press('Tab');
+  await page.getByRole('cell', { name: '12,00', exact: true }).waitFor();
+  await page.getByLabel('Origine de la quantité').selectOption('estime');
+  await page.getByText('1 estimée(s)').waitFor();
+  await page.getByText(/Enregistré/).waitFor({ timeout: 8000 });
+  ok('ligne de métré créée depuis un ouvrage de la bibliothèque, quantité marquée « estimée »');
+  await page.getByRole('button', { name: 'Générer un DQE', exact: true }).click();
+  const gen = page.getByRole('dialog');
+  await gen.getByText('Reprendre les prix de la bibliothèque (1 ouvrage(s) chiffré(s))').waitFor();
+  await gen.getByText('1 prix « à vérifier »').waitFor();
+  await gen.getByRole('button', { name: 'Générer', exact: true }).click();
+  await page.getByText('42 000').first().waitFor(); // 12 × 3 500 (prix du DQE importé)
+  await page.getByText(/Quantité estimée, à confirmer · Prix de bibliothèque « à vérifier »/).first().waitFor();
+  await page.getByText('À revoir : 1 quantité(s) estimée(s), 1 prix « à vérifier ».').waitFor();
+  await shot(page, '25-dqe-depuis-bibliotheque');
+  ok('DQE généré : prix repris de la bibliothèque (12 × 3 500 = 42 000), quantité estimée et prix « à vérifier » signalés avant validation');
+
   console.log('RECETTE RÉUSSIE');
 } catch (e) {
   console.error('ÉCHEC :', e.message);

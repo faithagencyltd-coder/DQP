@@ -1,7 +1,7 @@
 // Exports Excel (§14.6) : mêmes montants que l'écran et le PDF (moteur partagé).
 import ExcelJS from 'exceljs';
 import { bpuFromDoc, computeDoc } from '../engine/dqe';
-import { computeMetre, FORMULAS, type MetreLine, type MetreRules } from '../engine/metre';
+import { computeMetre, FORMULAS, lineOrigin, ORIGIN_LABEL, type MetreLine, type MetreRules } from '../engine/metre';
 import { currency } from '../engine/money';
 import type { Contact, MetreDoc, Organization, Project, Quote } from '../lib/types';
 import { downloadBlob, safeFileName } from '../lib/download';
@@ -93,12 +93,12 @@ export async function buildMetreXlsx(org: Organization, m: MetreDoc, lines: Metr
   wb.creator = 'PLANORA BTP';
   const ws = wb.addWorksheet('Métré');
   head(ws, org, `Métré — ${m.title}`, [['Référence', m.reference], ['Projet', project ? `${project.reference} — ${project.name}` : '—'], ['Arrondi', `${rules.decimals} décimale(s)`], ['Seuil de déduction des ouvertures', `${rules.openingThreshold} m²`]]);
-  ws.columns = [{ width: 9 }, { width: 36 }, { width: 16 }, { width: 18 }, { width: 22 }, { width: 9 }, { width: 9 }, { width: 9 }, { width: 8 }, { width: 8 }, { width: 12 }, { width: 8 }, { width: 70 }, { width: 24 }, { width: 24 }];
-  const h = ws.addRow(['Réf.', 'Désignation', 'Localisation', 'Lot', 'Formule', 'Longueur', 'Largeur', 'Hauteur', 'Nombre', 'Pertes %', 'Quantité', 'Unité', 'Détail du calcul', 'Source', 'Observations']);
+  ws.columns = [{ width: 9 }, { width: 36 }, { width: 16 }, { width: 18 }, { width: 22 }, { width: 9 }, { width: 9 }, { width: 9 }, { width: 8 }, { width: 8 }, { width: 12 }, { width: 8 }, { width: 18 }, { width: 70 }, { width: 24 }, { width: 24 }];
+  const h = ws.addRow(['Réf.', 'Désignation', 'Localisation', 'Lot', 'Formule', 'Longueur', 'Largeur', 'Hauteur', 'Nombre', 'Pertes %', 'Quantité', 'Unité', 'Origine de la quantité', 'Détail du calcul', 'Source', 'Observations']);
   h.eachCell((c) => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } }; });
   for (const l of lines) {
     const r = computeMetre(l, rules);
-    ws.addRow([l.ref, l.designation, l.location, l.lot, FORMULAS[l.formula].label + (l.expression ? ` : ${l.expression}` : ''), l.L, l.l, l.H, l.N, l.lossPct ?? null, r.qty ?? 'à compléter', l.unit, r.steps.join(' ; '), l.source, l.notes]);
+    ws.addRow([l.ref, l.designation, l.location, l.lot, FORMULAS[l.formula].label + (l.expression ? ` : ${l.expression}` : ''), l.L, l.l, l.H, l.N, l.lossPct ?? null, r.qty ?? 'à compléter', l.unit, ORIGIN_LABEL[lineOrigin(l)].label, r.steps.join(' ; '), l.source, l.notes]);
   }
   return wb.xlsx.writeBuffer() as Promise<ArrayBuffer>;
 }

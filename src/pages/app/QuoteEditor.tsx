@@ -8,7 +8,7 @@ import { errorMessage } from '../../lib/errors';
 import { QUOTE_STATUS, fmtDate, fmtDateTime } from '../../lib/labels';
 import { useOrg } from '../../lib/session';
 import type { Contact, PriceItem, Project, Quote, QuoteSettings, QuoteVersion } from '../../lib/types';
-import { applyBpu, cloneBody, computeDoc, missingLines, newLine, newLot, renumberLots, type DocBody, type DocLine } from '../../engine/dqe';
+import { applyBpu, cloneBody, computeDoc, missingLines, newLine, newLot, renumberLots, reviewPoints, type DocBody, type DocLine } from '../../engine/dqe';
 import { amountInWords, formatMoney, formatNumber, parseNumber } from '../../engine/money';
 import { UNITS } from '../../engine/units';
 import { Badge, Button, Card, Confirm, EmptyState, Field, Input, Modal, Notice, PageHeader, SearchInput, Select, Spinner, Textarea, useToast } from '../../ui';
@@ -56,6 +56,7 @@ export function QuoteEditor() {
   const isBpu = doc?.kind === 'bpu';
   const isDevis = doc?.kind === 'devis';
   const result = useMemo(() => (doc ? computeDoc(doc.body, isDevis ? doc.settings : { ...doc.settings, taxes: doc.settings.taxes ?? [] }) : null), [doc, isDevis]);
+  const review = useMemo(() => (doc ? reviewPoints(doc.body) : { estimated: 0, toVerify: 0 }), [doc]);
 
   // Sauvegarde automatique : le document et ses totaux calculés par le moteur.
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -264,6 +265,7 @@ export function QuoteEditor() {
               </dl>
               <p className="mt-3 text-[12px] italic text-muted">{amountInWords(isDevis && result.taxes.length ? result.totalTTC : result.netHT, cur)} {isDevis && result.taxes.length ? 'TTC' : 'HT'}</p>
               {result.incomplete > 0 && <Notice tone="warn" className="mt-3">{result.incomplete} ligne(s) sans quantité ou sans prix ne sont pas comptées.</Notice>}
+              {(review.estimated > 0 || review.toVerify > 0) && <Notice tone="warn" className="mt-3">À revoir : {[review.estimated ? `${review.estimated} quantité(s) estimée(s)` : '', review.toVerify ? `${review.toVerify} prix « à vérifier »` : ''].filter(Boolean).join(', ')}.</Notice>}
               <p className="mt-3 text-[11.5px] text-faint">Montant de ligne = quantité × prix unitaire, arrondi à {cur === 'XOF' || cur === 'XAF' ? 'l’unité (FCFA)' : 'deux décimales'}. Mêmes montants à l’écran, dans le PDF et dans l’Excel.</p>
             </Card>
           )}
@@ -323,7 +325,7 @@ export function QuoteEditor() {
         const line = doc.body.lots.find((l) => l.id === picker.lotId)?.lines.find((x) => x.id === picker.lineId);
         setLine(picker.lotId, picker.lineId, {
           unitPrice: p.sale_price, designation: line?.designation || p.designation, unit: line?.unit || p.unit, ref: line?.ref || p.code,
-          priceSource: { kind: p.kind === 'ouvrage' ? 'deboursé' : 'bibliotheque', id: p.id, label: `${p.code || p.designation} · ${p.price_date ? fmtDate(p.price_date) : 'date inconnue'}` },
+          priceSource: { kind: p.kind === 'ouvrage' ? 'deboursé' : 'bibliotheque', id: p.id, label: `${p.code || p.designation} · ${p.price_date ? fmtDate(p.price_date) : 'date inconnue'}${p.validation_status === 'a_verifier' ? ' · à vérifier' : ''}`, ...(p.validation_status === 'a_verifier' ? { toVerify: true } : {}) },
         });
         setPicker(null);
       }} />}
@@ -337,6 +339,8 @@ export function QuoteEditor() {
       {confirm === 'lock' && <Confirm title="Valider et verrouiller cette version ?" confirmLabel="Valider" onClose={() => setConfirm(null)} onConfirm={() => lock.mutateAsync(undefined)}>
         La version {doc.version} sera figée et enregistrée dans l’historique. Toute modification ultérieure passera par une nouvelle version.
         {result.incomplete > 0 && <Notice tone="warn" className="mt-3">{result.incomplete} ligne(s) sont encore incomplètes.</Notice>}
+        {review.estimated > 0 && <Notice tone="warn" className="mt-3">{review.estimated} quantité(s) <b>estimée(s)</b>, non confirmée(s) par un métré.</Notice>}
+        {review.toVerify > 0 && <Notice tone="warn" className="mt-3">{review.toVerify} prix de bibliothèque encore <b>« à vérifier »</b>.</Notice>}
       </Confirm>}
       {confirm === 'version' && <NewVersionDialog onClose={() => setConfirm(null)} onConfirm={(reason) => newVersion.mutateAsync(reason).then(() => undefined)} />}
       {confirm === 'delete' && <Confirm title="Supprimer ce document ?" danger confirmLabel="Supprimer" onClose={() => setConfirm(null)} onConfirm={() => remove.mutateAsync(undefined).then(() => nav(isDevis ? '/app/devis' : '/app/dqe'))}>Le brouillon {doc.reference} sera supprimé définitivement.</Confirm>}

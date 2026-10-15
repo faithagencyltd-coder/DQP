@@ -1,4 +1,4 @@
-import { Calculator, ChevronDown, ChevronRight, Copy, Download, FileSpreadsheet, Plus, Trash2 } from 'lucide-react';
+import { Calculator, ChevronDown, ChevronRight, Copy, Download, FileSpreadsheet, Library, Plus, Trash2 } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -6,13 +6,14 @@ import { insertRow, updateRow, useAction, useRow, useRows } from '../../lib/api'
 import { errorMessage } from '../../lib/errors';
 import { WORK_STATUS, fmtDateTime } from '../../lib/labels';
 import { useOrg } from '../../lib/session';
-import type { MetreDoc, Project, ProjectLot, Quote } from '../../lib/types';
-import { DEFAULT_RULES, DIM_LABEL, FORMULAS, computeMetre, groupMetre, type MetreFormula, type MetreLine, type MetreRules } from '../../engine/metre';
+import type { MetreDoc, PriceItem, Project, ProjectLot, Quote } from '../../lib/types';
+import { DEFAULT_RULES, DIM_LABEL, FORMULAS, ORIGIN_LABEL, computeMetre, groupMetre, lineFromLibrary, lineOrigin, type MetreFormula, type MetreLine, type MetreRules, type QtyOrigin } from '../../engine/metre';
 import { formatNumber, parseNumber } from '../../engine/money';
 import { uid } from '../../engine/ids';
 import { UNITS } from '../../engine/units';
 import { newLine, newLot, type DocBody } from '../../engine/dqe';
-import { Badge, Button, Card, Checkbox, DataTable, EmptyState, Field, Input, Modal, Notice, PageHeader, Select, Spinner, useToast } from '../../ui';
+import { Badge, Button, Card, Checkbox, DataTable, EmptyState, Field, Input, Modal, Notice, PageHeader, SearchInput, Select, Spinner, useToast } from '../../ui';
+import { fmtDate } from '../../lib/labels';
 import { Allowed } from '../../ui/guard';
 
 export function MetresPage() {
@@ -93,6 +94,7 @@ export function MetreEditor() {
   const [open, setOpen] = useState<string | null>(null);
   const [openingFor, setOpeningFor] = useState<MetreLine | null>(null);
   const [gen, setGen] = useState(false);
+  const [picking, setPicking] = useState(false);
   const lots = useRows<ProjectLot>('project_lots', org?.id, { filter: (q) => q.eq('project_id', doc.data?.project_id), order: ['sort'], key: [doc.data?.project_id], enabled: !!doc.data?.project_id });
 
   useEffect(() => {
@@ -150,6 +152,7 @@ export function MetreEditor() {
   }));
   const results = new Map(lines.map((l) => [l.id, computeMetre(l, rules)]));
   const incomplete = lines.filter((l) => results.get(l.id)!.qty === null).length;
+  const estimated = lines.filter((l) => lineOrigin(l) === 'estime').length;
   const project = (projects.data ?? []).find((p) => p.id === m.project_id);
 
   const exportExcel = async () => {
@@ -182,7 +185,7 @@ export function MetreEditor() {
           <Field label="Seuil de déduction des ouvertures (m²)" hint="Ouvertures plus petites : non déduites" className="w-64">
             <NumCell boxed label="Seuil" value={rules.openingThreshold} disabled={!editable} onChange={(v) => update(lines, { ...rules, openingThreshold: v ?? 0 })} />
           </Field>
-          <div className="text-[13px] text-muted">{lines.length} ligne(s){incomplete ? <> · <span className="font-semibold text-warn-600">{incomplete} incomplète(s)</span></> : ''}</div>
+          <div className="text-[13px] text-muted">{lines.length} ligne(s){incomplete ? <> · <span className="font-semibold text-warn-600">{incomplete} incomplète(s)</span></> : ''}{estimated ? <> · <span className="font-semibold text-warn-600">{estimated} estimée(s)</span></> : ''}</div>
         </Card>
         <Card bodyClass="flex items-center gap-2 py-3">
           <span className="text-[13px] text-muted">Statut :</span>
@@ -193,12 +196,12 @@ export function MetreEditor() {
       </div>
       <Card bodyClass="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-[13px]">
+          <table className="w-full min-w-[1200px] text-[13px]">
             <thead>
               <tr className="border-b border-line bg-navy-50/60 text-left text-[11.5px] font-semibold uppercase tracking-wide text-muted">
                 <th className="w-6" /><th className="px-1 py-2">Réf.</th><th className="px-1">Désignation</th><th className="px-1">Localisation</th><th className="px-1">Lot</th><th className="px-1">Formule</th>
                 <th className="px-1 text-right">Long.</th><th className="px-1 text-right">Larg.</th><th className="px-1 text-right">Haut.</th><th className="px-1 text-right">Nombre</th>
-                <th className="px-1 text-right">Pertes %</th><th className="px-2 text-right">Quantité</th><th className="px-1">Unité</th><th className="w-16" />
+                <th className="px-1 text-right">Pertes %</th><th className="px-2 text-right">Quantité</th><th className="px-1">Unité</th><th className="px-1">Origine</th><th className="w-16" />
               </tr>
             </thead>
             <tbody>
@@ -234,6 +237,11 @@ export function MetreEditor() {
                       <td className="px-1">
                         <select aria-label="Unité" disabled={!editable} className="cell-input w-20" value={l.unit} onChange={(e) => setLine(l.id, { unit: e.target.value })}>{UNITS.map((u) => <option key={u.code} value={u.code}>{u.code}</option>)}</select>
                       </td>
+                      <td className="px-1">
+                        <select aria-label="Origine de la quantité" disabled={!editable} title={ORIGIN_LABEL[lineOrigin(l)].help} className={`cell-input w-32 ${lineOrigin(l) === 'estime' ? '!text-warn-600 font-semibold' : ''}`} value={lineOrigin(l)} onChange={(e) => setLine(l.id, { origin: e.target.value as QtyOrigin })}>
+                          {Object.entries(ORIGIN_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                        </select>
+                      </td>
                       <td className="whitespace-nowrap px-1 text-right">
                         {editable && <button aria-label="Dupliquer" title="Dupliquer" className="rounded p-1 text-faint hover:text-ink" onClick={() => update([...lines.slice(0, lines.indexOf(l) + 1), { ...l, id: uid('m') }, ...lines.slice(lines.indexOf(l) + 1)])}><Copy size={14} /></button>}
                         {editable && <button aria-label="Supprimer" title="Supprimer" className="rounded p-1 text-faint hover:text-bad-600" onClick={() => update(lines.filter((x) => x.id !== l.id))}><Trash2 size={14} /></button>}
@@ -242,7 +250,7 @@ export function MetreEditor() {
                     {open === l.id && (
                       <tr className="border-b border-line-2 bg-navy-50/40">
                         <td />
-                        <td colSpan={13} className="px-2 py-3">
+                        <td colSpan={14} className="px-2 py-3">
                           <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
                             <div>
                               <div className="mb-1 text-[11.5px] font-semibold uppercase text-muted">Détail du calcul</div>
@@ -257,6 +265,7 @@ export function MetreEditor() {
                               )}
                             </div>
                             <div className="grid gap-3">
+                              {l.itemId && <p className="text-[12.5px] text-muted">Ouvrage de la bibliothèque <b className="text-navy-900">{l.itemCode || 'sans code'}</b> — origine de la quantité : {ORIGIN_LABEL[lineOrigin(l)].label.toLowerCase()} ({ORIGIN_LABEL[lineOrigin(l)].help}).</p>}
                               <Field label="Source de la mesure"><Input disabled={!editable} value={l.source} onChange={(e) => setLine(l.id, { source: e.target.value })} placeholder="Ex. Plan RDC indice B, cote relevée" /></Field>
                               <Field label="Observations"><Input disabled={!editable} value={l.notes} onChange={(e) => setLine(l.id, { notes: e.target.value })} /></Field>
                             </div>
@@ -275,12 +284,14 @@ export function MetreEditor() {
         {editable && (
           <div className="flex flex-wrap gap-2 border-t border-line-2 p-3">
             <Button icon={<Plus size={16} />} onClick={() => update([...lines, emptyLine(lines[lines.length - 1]?.lot ?? '')])}>Ajouter une ligne</Button>
+            <Button icon={<Library size={16} />} onClick={() => setPicking(true)}>Depuis la bibliothèque</Button>
             {dirty && <Button variant="ghost" onClick={() => void save(lines, rules)}>Enregistrer maintenant</Button>}
           </div>
         )}
       </Card>
       <GroupsCard lines={lines} rules={rules} />
       {openingFor && <OpeningsEditor line={openingFor} onClose={() => setOpeningFor(null)} onSave={(openings) => setLine(openingFor.id, { openings })} />}
+      {picking && <LibraryPicker onClose={() => setPicking(false)} onPick={(it) => { const line = lineFromLibrary(it, uid('m')); update([...lines, line]); setOpen(line.id); setPicking(false); }} />}
       {gen && <GenerateDqe metre={{ ...m, lines, rules }} onClose={() => setGen(false)} onCreated={(q) => nav(`/app/documents-chiffres/${q.id}`)} />}
     </>
   );
@@ -292,13 +303,14 @@ function GroupsCard({ lines, rules }: { lines: MetreLine[]; rules: MetreRules })
   return (
     <Card title="Récapitulatif par lot et par ouvrage" subtitle="Regroupement des lignes de même lot, désignation et unité — base du DQE" className="mt-4" bodyClass="p-0">
       <table className="w-full text-[13.5px]">
-        <thead><tr className="border-b border-line bg-navy-50/60 text-left text-[11.5px] uppercase text-muted"><th className="px-4 py-2">Lot</th><th className="px-2">Ouvrage</th><th className="px-2 text-right">Lignes</th><th className="px-4 text-right">Quantité</th></tr></thead>
+        <thead><tr className="border-b border-line bg-navy-50/60 text-left text-[11.5px] uppercase text-muted"><th className="px-4 py-2">Lot</th><th className="px-2">Ouvrage</th><th className="px-2 text-right">Lignes</th><th className="px-2">Origine</th><th className="px-4 text-right">Quantité</th></tr></thead>
         <tbody>
           {groups.map((g) => (
             <tr key={g.key} className="border-b border-line-2 last:border-0">
               <td className="px-4 py-2 text-muted">{g.lot || 'Sans lot'}</td>
               <td className="px-2">{g.designation}</td>
               <td className="px-2 text-right">{g.lineIds.length}</td>
+              <td className="px-2"><span className="flex flex-wrap gap-1">{g.origins.map((o) => <Badge key={o} tone={ORIGIN_LABEL[o].tone}>{ORIGIN_LABEL[o].short}</Badge>)}</span></td>
               <td className="tabular px-4 text-right font-semibold">{g.qty === null ? <span className="text-warn-600">incomplet ({g.incomplete} ligne(s))</span> : `${formatNumber(g.qty, rules.decimals, false)} ${g.unit}`}</td>
             </tr>
           ))}
@@ -339,8 +351,20 @@ function GenerateDqe({ metre, onClose, onCreated }: { metre: MetreDoc; onClose: 
   const [title, setTitle] = useState(`DQE — ${metre.title}`);
   const [kind, setKind] = useState<'dqe' | 'devis'>('dqe');
   const [skipIncomplete, setSkipIncomplete] = useState(false);
+  const [usePrices, setUsePrices] = useState(true);
   const groups = groupMetre(metre.lines.filter((l) => l.designation.trim()), metre.rules);
   const incomplete = groups.filter((g) => g.qty === null).length;
+  const estimated = groups.filter((g) => g.origins.includes('estime')).length;
+  const ids = [...new Set(groups.map((g) => g.itemId).filter((x): x is string => !!x))];
+  const items = useRows<PriceItem>('price_items', org?.id, { select: 'id, code, designation, kind, sale_price, currency, price_date, validation_status, archived_at', filter: (q) => q.in('id', ids), key: ['metre-dqe', ids.join(',')], enabled: ids.length > 0 });
+  const byId = new Map((items.data ?? []).map((p) => [p.id, p]));
+  // Prix repris : ouvrage commun à toutes les lignes du groupe, non rejeté, avec un prix de vente.
+  const priceOf = (itemId: string | null) => {
+    const p = itemId ? byId.get(itemId) : undefined;
+    return p && p.validation_status !== 'rejete' && p.sale_price !== null && p.currency === (org?.currency ?? p.currency) ? p : undefined;
+  };
+  const priced = groups.filter((g) => priceOf(g.itemId)).length;
+  const toVerify = groups.filter((g) => priceOf(g.itemId)?.validation_status === 'a_verifier').length;
   const create = useAction(async () => {
     const byLot = new Map<string, typeof groups>();
     for (const g of groups) {
@@ -349,7 +373,17 @@ function GenerateDqe({ metre, onClose, onCreated }: { metre: MetreDoc; onClose: 
     }
     const body: DocBody = { lots: [...byLot.entries()].map(([name, gs], i) => ({
       ...newLot(name, i),
-      lines: gs.map((g) => newLine({ designation: g.designation, unit: g.unit, qty: g.qty, qtySource: { kind: 'metre', id: metre.id, label: `${metre.reference} (${g.lineIds.length} ligne(s))`, verified: metre.status !== 'travail' } })),
+      lines: gs.map((g) => {
+        const p = usePrices ? priceOf(g.itemId) : undefined;
+        const origin = g.origins.includes('estime') ? ' · quantité estimée' : g.origins.includes('reconnu') ? ' · reconnue sur plan' : '';
+        const notes = [g.origins.includes('estime') ? 'Quantité estimée, à confirmer' : '', p?.validation_status === 'a_verifier' ? 'Prix de bibliothèque « à vérifier »' : ''].filter(Boolean);
+        return newLine({
+          ref: p?.code ?? '', designation: g.designation, unit: g.unit, qty: g.qty,
+          qtySource: { kind: 'metre', id: metre.id, label: `${metre.reference} (${g.lineIds.length} ligne(s))${origin}`, verified: metre.status !== 'travail' && !g.origins.includes('estime'), ...(g.origins.includes('estime') ? { estimated: true } : {}) },
+          ...(p ? { unitPrice: p.sale_price, priceSource: { kind: p.kind === 'ouvrage' ? 'deboursé' as const : 'bibliotheque' as const, id: p.id, label: `${p.code || p.designation} · ${p.price_date ? fmtDate(p.price_date) : 'date inconnue'}${p.validation_status === 'a_verifier' ? ' · à vérifier' : ''}`, ...(p.validation_status === 'a_verifier' ? { toVerify: true } : {}) } } : {}),
+          ...(notes.length ? { note: notes.join(' · ') } : {}),
+        });
+      }),
     })) };
     return insertRow<Quote>('quotes', {
       org_id: org!.id, kind, title: title.trim(), project_id: metre.project_id, source_kind: 'metre', source_id: metre.id, body,
@@ -360,17 +394,55 @@ function GenerateDqe({ metre, onClose, onCreated }: { metre: MetreDoc; onClose: 
   }, { success: (q) => `${q.reference} créé à partir du métré.`, invalidate: [['quotes']] });
   return (
     <Modal title="Générer un document chiffré depuis le métré" onClose={onClose}
-      footer={<><Button onClick={onClose}>Annuler</Button><Button variant="primary" loading={create.isPending} disabled={!title.trim()} onClick={() => create.mutate(undefined, { onSuccess: onCreated })}>Générer</Button></>}>
+      footer={<><Button onClick={onClose}>Annuler</Button><Button variant="primary" loading={create.isPending} disabled={!title.trim() || (ids.length > 0 && items.isLoading)} onClick={() => create.mutate(undefined, { onSuccess: onCreated })}>Générer</Button></>}>
       <div className="grid gap-4">
         <Field label="Type de document"><Select value={kind} onChange={(e) => setKind(e.target.value as 'dqe' | 'devis')}><option value="dqe">DQE (détail quantitatif estimatif)</option><option value="devis">Devis</option></Select></Field>
         <Field label="Titre"><Input value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
-        <p className="text-[13.5px] text-ink-2">{groups.length} ouvrage(s) regroupé(s) par lot. Les quantités sont reprises du métré avec leur source ; les prix unitaires seront à renseigner (bibliothèque, BPU ou saisie).</p>
+        <p className="text-[13.5px] text-ink-2">{groups.length} ouvrage(s) regroupé(s) par lot. Les quantités sont reprises du métré avec leur source et leur origine.</p>
+        {ids.length > 0 && (
+          <div className="rounded-lg border border-line p-3 text-[13px]">
+            <Checkbox label={`Reprendre les prix de la bibliothèque (${priced} ouvrage(s) chiffré(s))`} checked={usePrices} onChange={setUsePrices} />
+            <p className="mt-1 text-muted">Seuls les ouvrages de la bibliothèque non rejetés, avec un prix de vente dans la devise de l’entreprise, sont chiffrés ; les autres prix restent à renseigner.{toVerify > 0 && <> <b className="text-warn-600">{toVerify} prix « à vérifier »</b> seront signalés sur leur ligne.</>}</p>
+          </div>
+        )}
+        {estimated > 0 && <Notice tone="warn">{estimated} ouvrage(s) ont une quantité <b>estimée</b> : elle sera signalée « à confirmer » sur la ligne.</Notice>}
         {incomplete > 0 && (
           <Notice tone="warn" title={`${incomplete} ouvrage(s) sans quantité déterminée`}>
             Ils seront repris avec une quantité vide, signalée « à compléter ».
             <div className="mt-2"><Checkbox label="Ne pas reprendre ces ouvrages" checked={skipIncomplete} onChange={setSkipIncomplete} /></div>
           </Notice>
         )}
+      </div>
+    </Modal>
+  );
+}
+
+/** Choix d'un ouvrage de la bibliothèque pour une nouvelle ligne de métré. */
+function LibraryPicker({ onClose, onPick }: { onClose: () => void; onPick: (p: PriceItem) => void }) {
+  const { org } = useOrg();
+  const items = useRows<PriceItem>('price_items', org?.id, { order: ['designation'] });
+  const [q, setQ] = useState('');
+  const [trade, setTrade] = useState('');
+  const n = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const all = (items.data ?? []).filter((p) => !p.archived_at && p.validation_status !== 'rejete');
+  const trades = [...new Set(all.map((p) => p.trade).filter((t): t is string => !!t))].sort();
+  const list = all.filter((p) => (!trade || p.trade === trade) && (!q || n([p.code, p.designation, p.trade, p.category].join(' ')).includes(n(q)))).slice(0, 100);
+  return (
+    <Modal title="Ajouter un ouvrage de la bibliothèque" onClose={onClose} wide>
+      <p className="mb-3 text-[13px] text-ink-2">La ligne reprend la désignation, l’unité et le corps d’état de l’ouvrage, avec sa formule de métré si elle est renseignée. Les dimensions restent à saisir.</p>
+      <div className="grid gap-2 sm:grid-cols-[1fr_14rem]">
+        <SearchInput value={q} onChange={setQ} placeholder="Code, désignation, corps d’état…" />
+        <Select aria-label="Corps d’état" value={trade} onChange={(e) => setTrade(e.target.value)}><option value="">Tous corps d’état</option>{trades.map((t) => <option key={t}>{t}</option>)}</Select>
+      </div>
+      <div className="mt-3 max-h-[55vh] divide-y divide-line-2 overflow-y-auto rounded-lg border border-line">
+        {items.isLoading && <Spinner />}
+        {list.map((p) => (
+          <button key={p.id} onClick={() => onPick(p)} className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[13px] hover:bg-navy-50">
+            <span className="min-w-0"><span className="block truncate font-semibold text-navy-900">{p.designation}</span><span className="text-[11.5px] text-muted">{p.code || '—'} · {p.unit} · {p.trade ?? p.category}{p.formula ? ` · formule ${p.formula}` : ''}</span></span>
+            <span className="shrink-0 text-right">{p.validation_status === 'a_verifier' && <Badge tone="warn">à vérifier</Badge>}</span>
+          </button>
+        ))}
+        {!items.isLoading && !list.length && <p className="p-4 text-[13px] text-muted">Aucun ouvrage. Alimentez la bibliothèque (saisie ou import d’un DQE).</p>}
       </div>
     </Modal>
   );

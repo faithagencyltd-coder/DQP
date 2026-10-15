@@ -35,11 +35,11 @@ export function planToMetreLines(m: PlanModel, planRef: string): MetreLine[] {
     const area = polygonArea(r.points);
     const per = polygonPerimeter(r.points);
     out.push(rect
-      ? { id: uid('m'), ref: '', designation: 'Revêtement de sol', location: r.name, lot: '', formula: 'surface', L: rect.L, l: rect.l, H: null, N: 1, openings: [], unit: 'm²', source: src('pièce rectangulaire mesurée sur le dessin'), notes: '' }
-      : { id: uid('m'), ref: '', designation: 'Revêtement de sol', location: r.name, lot: '', formula: 'forfait', qty: r3(area), L: null, l: null, H: null, N: null, openings: [], unit: 'm²', source: src(`surface du polygone de ${r.points.length} sommets = ${formatArea(area)}`), notes: '' });
+      ? { id: uid('m'), ref: '', designation: 'Revêtement de sol', location: r.name, lot: '', formula: 'surface', L: rect.L, l: rect.l, H: null, N: 1, openings: [], unit: 'm²', origin: 'reconnu', source: src('pièce rectangulaire mesurée sur le dessin'), notes: '' }
+      : { id: uid('m'), ref: '', designation: 'Revêtement de sol', location: r.name, lot: '', formula: 'forfait', qty: r3(area), L: null, l: null, H: null, N: null, openings: [], unit: 'm²', origin: 'reconnu', source: src(`surface du polygone de ${r.points.length} sommets = ${formatArea(area)}`), notes: '' });
     out.push(rect
-      ? { id: uid('m'), ref: '', designation: 'Plinthes (périmètre de la pièce)', location: r.name, lot: '', formula: 'perimetre', L: rect.L, l: rect.l, H: null, N: 1, openings: [], unit: 'ml', source: src('périmètre de la pièce'), notes: 'Ouvertures non déduites' }
-      : { id: uid('m'), ref: '', designation: 'Plinthes (périmètre de la pièce)', location: r.name, lot: '', formula: 'forfait', qty: r3(per), L: null, l: null, H: null, N: null, openings: [], unit: 'ml', source: src(`périmètre du polygone = ${r3(per)} m`), notes: 'Ouvertures non déduites' });
+      ? { id: uid('m'), ref: '', designation: 'Plinthes (périmètre de la pièce)', location: r.name, lot: '', formula: 'perimetre', L: rect.L, l: rect.l, H: null, N: 1, openings: [], unit: 'ml', origin: 'reconnu', source: src('périmètre de la pièce'), notes: 'Ouvertures non déduites' }
+      : { id: uid('m'), ref: '', designation: 'Plinthes (périmètre de la pièce)', location: r.name, lot: '', formula: 'forfait', qty: r3(per), L: null, l: null, H: null, N: null, openings: [], unit: 'ml', origin: 'reconnu', source: src(`périmètre du polygone = ${r3(per)} m`), notes: 'Ouvertures non déduites' });
   }
   m.walls.forEach((w, i) => {
     const ops = m.openings.filter((o) => o.wallId === w.id);
@@ -47,7 +47,7 @@ export function planToMetreLines(m: PlanModel, planRef: string): MetreLine[] {
       id: uid('m'), ref: '', designation: `${WALL_KINDS[w.kind].label} ép. ${Math.round(w.thickness * 100)} cm`, location: `Mur ${i + 1}`, lot: '',
       formula: 'mur', L: r3(wallLength(w)), l: null, H: m.wallHeight, N: 1,
       openings: ops.map((o) => ({ label: `${OPENING_KINDS[o.kind].label} ${Math.round(o.width * 100)}`, width: r3(o.width), height: o.height, count: 1 })),
-      unit: 'm²', source: src('longueur d’axe du mur'), notes: m.wallHeight === null ? 'Hauteur à renseigner dans le plan ou ici' : '',
+      unit: 'm²', origin: 'reconnu', source: src('longueur d’axe du mur'), notes: m.wallHeight === null ? 'Hauteur à renseigner dans le plan ou ici' : '',
     });
   });
   return out;

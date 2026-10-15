@@ -7,7 +7,7 @@ import { jsPDF } from 'jspdf';
 import autoTable, { type RowInput } from 'jspdf-autotable';
 import { amountInWords, formatMoney, formatNumber } from '../engine/money';
 import { bpuFromDoc, computeDoc } from '../engine/dqe';
-import { computeMetre, FORMULAS } from '../engine/metre';
+import { computeMetre, FORMULAS, lineOrigin, ORIGIN_LABEL } from '../engine/metre';
 import { COUNTRIES, CLIENT_TYPES } from '../lib/labels';
 import type { Contact, MetreDoc, Organization, Project, Quote } from '../lib/types';
 
@@ -239,7 +239,7 @@ export function buildMetrePdf(m: MetreDoc, ctx: PdfContext): jsPDF {
     const r = computeMetre(l, m.rules);
     return [t(l.ref), t(l.designation), t(l.location), t(l.lot), t(FORMULAS[l.formula].label + (l.formula === 'libre' && l.expression ? ` : ${l.expression}` : '')),
       l.L === null ? '' : t(formatNumber(l.L, 3)), l.l === null ? '' : t(formatNumber(l.l, 3)), l.H === null ? '' : t(formatNumber(l.H, 3)), l.N === null ? '' : t(formatNumber(l.N, 3)),
-      r.qty === null ? { content: 'à compléter', styles: { textColor: [180, 83, 9] } } : t(formatNumber(r.qty, m.rules.decimals, false)), t(l.unit), t([r.steps.join(' ; '), l.source, l.notes].filter(Boolean).join(' — '))];
+      r.qty === null ? { content: 'à compléter', styles: { textColor: [180, 83, 9] } } : t(formatNumber(r.qty, m.rules.decimals, false)), t(l.unit), t([`Quantité ${ORIGIN_LABEL[lineOrigin(l)].label.toLowerCase()}`, r.steps.join(' ; '), l.source, l.notes].filter(Boolean).join(' — '))];
   });
   autoTable(doc, {
     startY: y, margin: { left: M, right: M, bottom: 20 },

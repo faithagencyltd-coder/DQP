@@ -84,8 +84,9 @@ importés « à vérifier ».
 |---|---|---|
 | 1. Audit et sécurisation | cet audit ; nom « PLANORA BTP » partout (messages de l’ancien moteur « DQP » corrigés) | ✅ fait |
 | 2. Bibliothèque et métré | import d’un DQE Excel dans la bibliothèque, traçabilité (fichier, feuille, cellule), anomalies, statut de validation, fiche d’ouvrage (corps d’état, méthode de métré, formule) | ✅ fait (import, validation) |
-| 2 (suite) | appliquer la méthode de métré et la formule de l’ouvrage dans le moteur de métré ; origine de chaque quantité : *calculée*, *reconnue sur plan*, *estimée*, *saisie* | à faire |
-| 3. DQE, BPU, documents | DQE construit depuis la bibliothèque des travaux (par corps d’état, sections reprises), BPU, contrôle des ouvrages « à vérifier » avant émission | à faire |
+| 2 (suite) | ligne de métré depuis un ouvrage (formule de l’ouvrage appliquée) ; origine de chaque quantité : *calculée*, *reconnue sur plan*, *estimée*, *saisie* | ✅ fait |
+| 3. DQE, BPU, documents | DQE généré depuis le métré avec les prix de la bibliothèque, source tracée ; quantités estimées et prix « à vérifier » signalés avant validation | ✅ fait (contrôle bloquant côté serveur : à venir) |
+| 3 (suite) | DQE type par corps d’état directement depuis la bibliothèque (sans métré), sections du DQE d’origine reprises | à faire |
 | 4. Plans techniques | électricité, plomberie, CVC, aération, carrelage, peinture : symboles, comptages et longueurs **tracés ou confirmés par l’utilisateur** ; aucune reconnaissance automatique présentée comme fiable sans test | à faire |
 | 5. Assistants par corps d’état | listes de contrôle et calculs par métier à partir de la bibliothèque validée ; IA facultative et désactivée par défaut | à faire |
 | 6. Production | projet Supabase (créé par vous), déploiement, service de courriel, prestataire de paiement, sauvegardes, supervision | en attente de vos choix |
