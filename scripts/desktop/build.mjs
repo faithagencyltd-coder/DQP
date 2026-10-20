@@ -66,6 +66,8 @@ function brandExe(exe) {
 const electronVersion = JSON.parse(fs.readFileSync(path.join(root, 'node_modules/electron/package.json'), 'utf8')).version;
 const out = await build({
   projectDir: root,
+  // Aucune publication automatique (la mise à disposition est faite par le workflow GitHub).
+  publish: 'never',
   targets: Platform.WINDOWS.createTarget(args.has('--dir') ? ['dir'] : ['nsis'], Arch.x64),
   config: {
     appId: 'bj.planora.btp',
