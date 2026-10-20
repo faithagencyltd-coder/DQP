@@ -48,8 +48,17 @@ async function ensureLoggedIn(page) {
   // Bandeau du logiciel : présent dès que l'application est ouverte (quelle que soit la largeur de la fenêtre).
   const app = page.getByRole('button', { name: 'Sauvegarder les données', exact: true });
   const form = page.getByLabel('Adresse e-mail');
-  await Promise.race([app.waitFor(), form.waitFor()]);
-  if (await form.isVisible().catch(() => false)) await login(page);
+  // La page de connexion peut s'afficher un instant avant la redirection vers l'application :
+  // on ne se connecte que si elle reste affichée.
+  let formSince = 0;
+  for (const t0 = Date.now(); Date.now() - t0 < 90000; await page.waitForTimeout(250)) {
+    if (await app.isVisible().catch(() => false)) return;
+    if (await form.isVisible().catch(() => false)) {
+      formSince ||= Date.now();
+      if (Date.now() - formSince > 2500) { await login(page); return; }
+    } else formSince = 0;
+  }
+  throw new Error('ni l’application ni la page de connexion ne s’affichent');
 }
 const clientVisible = async (page, name) => {
   await page.evaluate(() => { location.hash = '#/app/clients'; });
