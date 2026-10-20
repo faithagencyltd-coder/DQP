@@ -88,6 +88,8 @@ try {
   ok('un second lancement ne crée pas de deuxième fenêtre (base protégée)');
 
   await run.app.close();
+  // Windows libère les fichiers de la base quelques instants après la fermeture du logiciel.
+  await new Promise((r) => setTimeout(r, process.platform === 'win32' ? 5000 : 500));
   run = await start();
   page = run.page;
   await page.evaluate(() => { if (!location.hash || location.hash === '#/') location.hash = '#/connexion'; });
@@ -115,6 +117,8 @@ try {
   console.log(errors.length ? 'Erreurs : ' + [...new Set(errors)].join(' | ') : 'LOGICIEL OK');
 } catch (e) {
   console.error('ÉCHEC :', e.message);
+  const text = await run?.page.evaluate(() => `${location.href}\n${document.body.innerText.slice(0, 800)}`).catch(() => '(page indisponible)');
+  console.error('Écran au moment de l’échec :\n' + text);
   await run?.page.screenshot({ path: `${OUT}/logiciel-echec.png` }).catch(() => undefined);
   process.exitCode = 1;
 } finally {
