@@ -202,3 +202,26 @@ export function reviewPoints(body: DocBody): { estimated: number; toVerify: numb
   const lines = body.lots.flatMap((l) => l.lines).filter((l) => l.kind === 'ouvrage');
   return { estimated: lines.filter((l) => l.qtySource?.estimated).length, toVerify: lines.filter((l) => l.priceSource?.toVerify).length };
 }
+
+/**
+ * Met à jour les mentions « à vérifier » d'après le statut actuel des ouvrages dans la bibliothèque :
+ * un prix validé entre-temps perd sa mention (étiquette et note). Les autres restent signalés.
+ */
+export function refreshReviewFlags(body: DocBody, status: Map<string, string>): { body: DocBody; cleared: number } {
+  let cleared = 0;
+  const NOTE = 'Prix de bibliothèque « à vérifier »';
+  const lots = body.lots.map((lot) => ({
+    ...lot,
+    lines: lot.lines.map((l) => {
+      const ps = l.priceSource;
+      if (!ps?.toVerify || !ps.id || status.get(ps.id) !== 'valide') return l;
+      cleared++;
+      const { toVerify: _drop, ...rest } = ps; // eslint-disable-line @typescript-eslint/no-unused-vars
+      const note = (l.note ?? '').split(' · ').filter((n) => n && n !== NOTE).join(' · ');
+      const next: DocLine = { ...l, priceSource: { ...rest, label: rest.label?.replace(/ · à vérifier$/, '') } };
+      if (note) next.note = note; else delete next.note;
+      return next;
+    }),
+  }));
+  return { body: { lots }, cleared };
+}

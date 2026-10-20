@@ -278,7 +278,7 @@ export function Confirm({ title, children, confirmLabel = 'Confirmer', danger, o
       footer={
         <>
           <Button onClick={onClose}>Annuler</Button>
-          <Button variant={danger ? 'danger' : 'primary'} loading={busy} disabled={!ok} onClick={async () => { setBusy(true); try { await onConfirm(); onClose(); } finally { setBusy(false); } }}>
+          <Button variant={danger ? 'danger' : 'primary'} loading={busy} disabled={!ok} onClick={async () => { setBusy(true); try { await onConfirm(); onClose(); } catch { /* erreur déjà signalée par l'action ; la fenêtre reste ouverte */ } finally { setBusy(false); } }}>
             {confirmLabel}
           </Button>
         </>

@@ -8,7 +8,7 @@ import { errorMessage } from '../../lib/errors';
 import { QUOTE_STATUS, fmtDate, fmtDateTime } from '../../lib/labels';
 import { useOrg } from '../../lib/session';
 import type { Contact, PriceItem, Project, Quote, QuoteSettings, QuoteVersion } from '../../lib/types';
-import { applyBpu, cloneBody, computeDoc, missingLines, newLine, newLot, renumberLots, reviewPoints, type DocBody, type DocLine } from '../../engine/dqe';
+import { applyBpu, cloneBody, computeDoc, missingLines, newLine, newLot, refreshReviewFlags, renumberLots, reviewPoints, type DocBody, type DocLine } from '../../engine/dqe';
 import { amountInWords, formatMoney, formatNumber, parseNumber } from '../../engine/money';
 import { UNITS } from '../../engine/units';
 import { Badge, Button, Card, Confirm, EmptyState, Field, Input, Modal, Notice, PageHeader, SearchInput, Select, Spinner, Textarea, useToast } from '../../ui';
@@ -120,7 +120,20 @@ export function QuoteEditor() {
   const client = (contacts.data ?? []).find((c) => c.id === doc?.client_id);
   const project = (projects.data ?? []).find((p) => p.id === doc?.project_id);
 
-  const lock = useAction(async () => { await flush(); await rpc('lock_quote', { p_quote: id }); }, { success: 'Version validée et verrouillée.', invalidate: [['quotes']] });
+  const lock = useAction(async () => {
+    await flush();
+    // Prix « à vérifier » : statut relu dans la bibliothèque (un ouvrage validé entre-temps perd sa
+    // mention). La base refuse la validation s'il en reste.
+    const ids = [...new Set(doc!.body.lots.flatMap((l) => l.lines).map((l) => (l.priceSource?.toVerify ? l.priceSource.id : undefined)).filter((x): x is string => !!x))];
+    if (ids.length) {
+      const { supabase } = await import('../../lib/supabase');
+      const { data, error } = await supabase.from('price_items').select('id, validation_status').in('id', ids);
+      if (error) throw new Error(errorMessage(error));
+      const { body, cleared } = refreshReviewFlags(doc!.body, new Map((data ?? []).map((p: { id: string; validation_status: string }) => [p.id, p.validation_status])));
+      if (cleared) { const next = { ...doc!, body }; setDoc(next); await persist(next); }
+    }
+    await rpc('lock_quote', { p_quote: id });
+  }, { success: 'Version validée et verrouillée.', invalidate: [['quotes']] });
   const newVersion = useAction(async (reason: string) => rpc<number>('new_quote_version', { p_quote: id, p_reason: reason || null }), { success: (v) => `Version ${v} créée : modifiable.`, invalidate: [['quotes'], ['quote_versions']] });
   const setStatus = useAction(async (a: { status: string; note?: string }) => {
     await flush();
@@ -340,7 +353,7 @@ export function QuoteEditor() {
         La version {doc.version} sera figée et enregistrée dans l’historique. Toute modification ultérieure passera par une nouvelle version.
         {result.incomplete > 0 && <Notice tone="warn" className="mt-3">{result.incomplete} ligne(s) sont encore incomplètes.</Notice>}
         {review.estimated > 0 && <Notice tone="warn" className="mt-3">{review.estimated} quantité(s) <b>estimée(s)</b>, non confirmée(s) par un métré.</Notice>}
-        {review.toVerify > 0 && <Notice tone="warn" className="mt-3">{review.toVerify} prix de bibliothèque encore <b>« à vérifier »</b>.</Notice>}
+        {review.toVerify > 0 && <Notice tone="bad" className="mt-3">{review.toVerify} prix de bibliothèque marqué(s) <b>« à vérifier »</b>. Leur statut est relu dans la bibliothèque : la validation sera refusée s’il en reste qui n’ont pas été validés. Validez ces ouvrages dans la bibliothèque ou ressaisissez leur prix.</Notice>}
       </Confirm>}
       {confirm === 'version' && <NewVersionDialog onClose={() => setConfirm(null)} onConfirm={(reason) => newVersion.mutateAsync(reason).then(() => undefined)} />}
       {confirm === 'delete' && <Confirm title="Supprimer ce document ?" danger confirmLabel="Supprimer" onClose={() => setConfirm(null)} onConfirm={() => remove.mutateAsync(undefined).then(() => nav(isDevis ? '/app/devis' : '/app/dqe'))}>Le brouillon {doc.reference} sera supprimé définitivement.</Confirm>}

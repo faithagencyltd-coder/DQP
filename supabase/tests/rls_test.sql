@@ -469,7 +469,13 @@ with x as (insert into public.price_items (org_id, kind, code, designation, unit
 insert into tests.ids select 'ouv', id from x;
 select tests.check((select validation_status = 'a_verifier' and validated_by is null from public.price_items where id = tests.id('ouv')::uuid), 'ouvrage importé : à vérifier');
 select tests.fails(format('update public.price_items set source_ref = ''{"file":"autre.xlsx"}'' where id = %L', tests.id('ouv')), 'permission denied', 'la source d''un ouvrage importé ne se réécrit pas');
+with x as (insert into public.quotes (org_id, kind, title, body) values (tests.id('org2')::uuid, 'dqe', 'DQE type', jsonb_build_object('lots', jsonb_build_array(jsonb_build_object('id', 'L1', 'code', 'LOT 01', 'name', 'MACONNERIE - BETON', 'lines', jsonb_build_array(
+  jsonb_build_object('id', 'l1', 'kind', 'ouvrage', 'ref', 'GO-001', 'designation', 'Fouilles', 'unit', 'm³', 'qty', 10, 'unitPrice', 2000, 'priceSource', jsonb_build_object('kind', 'bibliotheque', 'id', tests.id('ouv')))))))) returning id)
+insert into tests.ids select 'dqe_type', id from x;
+select tests.fails(format('select public.lock_quote(%L)', tests.id('dqe_type')), 'à vérifier.*GO-001', 'DQE reprenant un prix « à vérifier » : validation refusée');
 update public.price_items set validation_status = 'valide' where id = tests.id('ouv')::uuid;
+select public.lock_quote(tests.id('dqe_type')::uuid);
+select tests.check((select locked from public.quotes where id = tests.id('dqe_type')::uuid), 'prix validé dans la bibliothèque : le DQE se valide');
 select tests.check((select validated_by = auth.uid() and validated_at is not null from public.price_items where id = tests.id('ouv')::uuid), 'validation tracée (qui, quand)');
 select tests.fails(format('update public.library_imports set file_name = ''x'' where id = %L', tests.id('imp')), 'permission denied', 'journal des imports non modifiable');
 select tests.login('00000000-0000-0000-0000-00000000000a');

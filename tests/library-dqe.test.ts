@@ -1,6 +1,6 @@
 // DQE / BPU type construit à partir de la bibliothèque des travaux.
 import { describe, expect, test } from 'vitest';
-import { computeDoc, reviewPoints } from '../src/engine/dqe';
+import { computeDoc, refreshReviewFlags, reviewPoints } from '../src/engine/dqe';
 import { libraryToBody, libraryTrades, type LibraryDqeItem } from '../src/engine/library-dqe';
 
 const it = (p: Partial<LibraryDqeItem> & Pick<LibraryDqeItem, 'id' | 'code' | 'designation'>): LibraryDqeItem => ({
@@ -55,5 +55,24 @@ describe('DQE type depuis la bibliothèque', () => {
     expect(peinture.unitPrice).toBeNull();
     expect(peinture.note).toBe('Prix en EUR non repris');
     expect(stats).toMatchObject({ ouvrages: 5, ecartes: 1, autreDevise: 1 });
+  });
+});
+
+describe('mentions « à vérifier » mises à jour avant validation', () => {
+  test('un prix validé entre-temps perd sa mention, les autres la gardent', () => {
+    const { body } = libraryToBody([
+      ...items,
+      it({ id: '9', code: 'EL-009', designation: 'Interrupteur', trade: 'ELECTRICITE', sale_price: 1500, validation_status: 'a_verifier' }),
+    ], { trades: ['ELECTRICITE'], includeToVerify: true, withSections: false, currency: 'XOF' });
+    expect(reviewPoints(body).toVerify).toBe(2);
+    const r = refreshReviewFlags(body, new Map([['1', 'valide'], ['9', 'a_verifier']]));
+    expect(r.cleared).toBe(1);
+    const prise = r.body.lots[0].lines.find((l) => l.ref === 'EL-001')!;
+    expect(prise.priceSource).toEqual({ kind: 'bibliotheque', id: '1', label: 'EL-001 · 15/10/2026' });
+    expect(prise.note).toBeUndefined();
+    expect(prise.unitPrice).toBe(3500);
+    expect(reviewPoints(r.body).toVerify).toBe(1);
+    // Le document d'origine n'est pas modifié.
+    expect(reviewPoints(body).toVerify).toBe(2);
   });
 });

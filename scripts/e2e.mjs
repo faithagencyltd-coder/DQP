@@ -820,6 +820,29 @@ try {
   await page.getByText('3 ligne(s) sans quantité ou sans prix ne sont pas comptées.').waitFor();
   ok('DQE type créé depuis la bibliothèque (lot ELECTRICITE, prix repris, quantités à saisir, prix « à vérifier » signalés)');
 
+  // ------------------------------------------------------------ validation refusée tant qu'un prix est « à vérifier »
+  await page.getByRole('button', { name: 'Valider et verrouiller', exact: true }).click();
+  await page.getByRole('dialog').getByText(/la validation sera refusée s’il en reste/).waitFor();
+  await page.getByRole('dialog').getByRole('button', { name: 'Valider', exact: true }).click();
+  await page.getByText(/Validation impossible : 2 prix de la bibliothèque encore « à vérifier » \(EL-001, EL-003\)/).waitFor();
+  await page.getByRole('dialog').getByRole('button', { name: 'Annuler', exact: true }).click();
+  const dqeUrl = page.url();
+  await nav(page, 'Bibliothèque de prix');
+  await page.getByLabel('Statut de validation').selectOption('a_verifier');
+  for (const name of ['Fourniture et pose de prise 2P+T', 'Fourniture et pose de prise 2P+T']) {
+    await page.getByText(name).filter({ visible: true }).first().click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Valider', exact: true }).click();
+    await page.getByText('Ouvrage validé.').first().waitFor();
+    await page.getByRole('dialog').waitFor({ state: 'detached' });
+  }
+  await page.goto(dqeUrl);
+  await page.getByText('À revoir : 2 prix « à vérifier ».').waitFor();
+  await page.getByRole('button', { name: 'Valider et verrouiller', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Valider', exact: true }).click();
+  await page.getByText('Version validée et verrouillée.').waitFor();
+  await page.getByText(/À revoir/).waitFor({ state: 'detached' });
+  ok('validation refusée par la base tant que 2 prix sont « à vérifier », acceptée une fois les ouvrages validés (mentions retirées)');
+
   console.log('RECETTE RÉUSSIE');
 } catch (e) {
   console.error('ÉCHEC :', e.message);
