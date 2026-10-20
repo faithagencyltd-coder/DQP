@@ -12,4 +12,7 @@ export const config = {
 /** Version de démonstration autonome (un seul fichier HTML, base embarquée dans le navigateur). */
 export const isDemo = import.meta.env.VITE_DEMO === '1';
 
+/** Logiciel installé sur l'ordinateur (même moteur autonome que la démonstration). */
+export const isDesktop = import.meta.env.VITE_DESKTOP === '1';
+
 export const isConfigured = () => isDemo || (!!config.supabaseUrl && !!config.supabaseKey);

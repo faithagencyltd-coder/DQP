@@ -7,3 +7,7 @@ dist/
 # Fichiers de projets clients : ne jamais les versionner
 samples/private/
 dist-demo/
+dist-desktop/
+dist-installer/
+desktop/app/index.html
+desktop/app/package.json

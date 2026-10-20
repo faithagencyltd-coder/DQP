@@ -1,0 +1,43 @@
+name: PLANORA BTP — logiciel Windows
+
+# Construit l'installeur Windows sur un vrai Windows, vérifie le logiciel (démarrage, données,
+# sauvegarde, restauration) puis le met à disposition : artefact de la construction et, pour une
+# étiquette « v… », publication dans les versions (Releases) du dépôt.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Construction de l'installeur
+        run: node scripts/desktop/build.mjs
+      - name: Recette du logiciel sur Windows
+        run: node scripts/desktop/smoke.mjs recette-logiciel
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PLANORA-BTP-Windows
+          path: |
+            dist-installer/*.exe
+            recette-logiciel/*.png
+          if-no-files-found: warn
+      - name: Publication de la version
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-installer/*.exe
+          body: |
+            Installeur Windows de PLANORA BTP (version d'essai, fonctionne sans Internet).
+            Téléchargez le fichier .exe, lancez-le et suivez l'assistant. Voir docs/LOGICIEL_WINDOWS.md.

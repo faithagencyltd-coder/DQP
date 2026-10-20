@@ -1,6 +1,6 @@
 # PLANORA BTP — documentation de test
 
-Trois niveaux de tests automatisés, plus une recette manuelle.
+Tests automatisés (moteur, base, navigateur, démonstration, logiciel installé), plus une recette manuelle.
 
 ## 1. Moteur de calcul, PDF et Excel — `npm test`
 
@@ -45,7 +45,7 @@ Trois niveaux de tests automatisés, plus une recette manuelle.
 ## 2. Sécurité et règles de la base — `sh supabase/tests/run.sh`
 
 Applique les migrations sur un PostgreSQL vierge, avec un environnement qui imite Supabase
-(`supabase/tests/shim_supabase.sql`), puis exécute `supabase/tests/rls_test.sql` : 192 contrôles, parmi lesquels :
+(`supabase/tests/shim_supabase.sql`), puis exécute `supabase/tests/rls_test.sql` : 194 contrôles, parmi lesquels :
 isolation entre entreprises (lecture, écriture, fichiers, journal), permissions par rôle et matrice
 modifiable, invitations, limites d’offre, abonnement échu en lecture seule, versions verrouillées, métré
 approuvé figé, historique des prix, demandes d’abonnement, administration sans accès au contenu,
@@ -68,7 +68,7 @@ PGHOST=/chemin/socket PGPORT=5432 sh supabase/tests/run.sh   # utilisateur « po
 
 Pilote un vrai navigateur sur une pile locale (`scripts/local-stack/`) : PostgreSQL avec les migrations,
 PostgREST, et une passerelle qui joue l’authentification, le stockage et la fonction serveur de Supabase.
-65 étapes : inscription, confirmation, entreprise, client, doublon, projet et lots, article et ouvrage composé,
+66 étapes : inscription, confirmation, entreprise, client, doublon, projet et lots, article et ouvrage composé,
 métré, DQE, devis, PDF, Excel, validation, nouvelle version, invitation d’un métreur sur téléphone,
 permissions, demande d’abonnement (offre Professionnelle), activation par l’administration ; facture
 d’acompte depuis le devis, émission, paiement partiel, PDF, dépense, onglet Finances du chantier ; dépôts,
@@ -153,11 +153,29 @@ installation, sans serveur et sans Internet (Chrome, Edge ou Firefox récents) :
   propriétaire et administrateur de la plateforme ; `conducteur@planora.bj`, droits limités ; mot de passe
   `Demo2026`) et une entreprise d'exemple sur l'offre Professionnelle ; toutes les données d'exemple sont
   marquées fictives ;
-- données conservées dans le navigateur (IndexedDB), une seule fenêtre à la fois, bouton « Réinitialiser » ;
+- données conservées dans le navigateur (IndexedDB), une seule fenêtre à la fois, sauvegarde et restauration
+  des données, bouton « Réinitialiser » ; une nouvelle version applique les migrations manquantes à la base
+  existante (`src/demo/migrate.ts`, `tests/demo-upgrade.test.ts`) au lieu de repartir de zéro ;
 - rendu IA et envoi de courriels indisponibles (services en ligne).
 
 Vérifications :
 - `node scripts/demo/serve-backend.mjs` expose le même serveur interne en HTTP (port 54320) : la recette
-  complète (`scripts/e2e.mjs`, 65 étapes) y passe entièrement ;
+  complète (`scripts/e2e.mjs`, 66 étapes) y passe entièrement ;
 - `node scripts/demo/smoke.mjs dist-demo/index.html` ouvre le fichier depuis le disque : connexion,
   écriture, conservation après rechargement, second onglet refusé, devis et PDF, administration.
+
+## 7. Logiciel installable Windows — `npm run build:desktop`
+
+Même application autonome que la démonstration, dans une fenêtre de logiciel (Electron) avec installeur
+Windows (NSIS, x64) : `dist-installer/PLANORA-BTP-Installation-<version>.exe`. Guide : `docs/LOGICIEL_WINDOWS.md`.
+
+Vérifications :
+- `tests/demo-upgrade.test.ts` : base de l’ancienne version mise à jour (migrations suivantes appliquées,
+  données conservées), second démarrage sans rien refaire, données d’une version plus récente refusées ;
+  base de départ déjà à jour ;
+- `xvfb-run -a node scripts/desktop/smoke.mjs` (Electron pour Linux, même application) : démarrage et
+  connexion, écriture en base, sauvegarde `.planora`, second lancement refusé, fermeture puis réouverture
+  (données conservées), restauration (état sauvegardé retrouvé), faux fichier de sauvegarde refusé ;
+- installeur installé silencieusement sous Wine (`/S`) : programme, désinstalleur, raccourcis bureau et
+  menu Démarrer, icône et informations de version vérifiés ;
+- `.github/workflows/logiciel.yml` : construction et même recette sur un vrai Windows (GitHub Actions).

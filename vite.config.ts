@@ -27,7 +27,9 @@ function demoAssets(): Plugin {
       const gz = (f: string) => zlib.gzipSync(fs.readFileSync(path.join(dist, f)), { level: 9 }).toString('base64');
       const { buildSeed } = await import('./scripts/demo/build-seed.mjs');
       const seed = Buffer.from(await buildSeed(__dirname)).toString('base64');
-      const assets = { wasm: gz('pglite.wasm'), data: gz('pglite.data'), pgcrypto: fs.readFileSync(path.join(dist, 'pgcrypto.tar.gz')).toString('base64'), seed };
+      const mdir = path.resolve(__dirname, 'supabase/migrations');
+      const migrations = fs.readdirSync(mdir).filter((f) => f.endsWith('.sql')).sort().map((name) => ({ name, sql: fs.readFileSync(path.join(mdir, name), 'utf8') }));
+      const assets = { wasm: gz('pglite.wasm'), data: gz('pglite.data'), pgcrypto: fs.readFileSync(path.join(dist, 'pgcrypto.tar.gz')).toString('base64'), seed, migrations };
       return `export default ${JSON.stringify(assets)};`;
     },
   };
@@ -47,7 +49,7 @@ function demoStub(): Plugin {
     },
     load: (i) => (i === stub
       ? `const off = () => { throw new Error('Version de démonstration non incluse'); };
-         export const getDemoDb = off, resetDemo = off, demoFetch = off, demoFileBlob = off;`
+         export const getDemoDb = off, resetDemo = off, demoFetch = off, demoFileBlob = off, exportBackup = off, restoreBackup = off;`
       : null),
   };
 }
@@ -55,14 +57,16 @@ function demoStub(): Plugin {
 // base relative : l'application fonctionne aussi bien à la racine d'un domaine que dans un
 // sous-dossier (GitHub Pages : /DQP/), ou ouverte directement depuis le disque (démonstration).
 export default defineConfig(({ mode }) => {
-  const demo = mode === 'demo';
+  // « desktop » : même application autonome que la démonstration, pour le logiciel installé.
+  const desktop = mode === 'desktop';
+  const demo = mode === 'demo' || desktop;
   return {
     base: './',
-    define: demo ? { 'import.meta.env.VITE_DEMO': JSON.stringify('1') } : undefined,
+    define: demo ? { 'import.meta.env.VITE_DEMO': JSON.stringify('1'), 'import.meta.env.VITE_DESKTOP': JSON.stringify(desktop ? '1' : '') } : undefined,
     plugins: [react(), tailwindcss(), ...(demo ? [demoAssets(), viteSingleFile({ removeViteModuleLoader: true })] : [demoStub()])],
     optimizeDeps: { exclude: ['@electric-sql/pglite'] },
     build: demo
-      ? { outDir: 'dist-demo', chunkSizeWarningLimit: 100000, assetsInlineLimit: 100_000_000 }
+      ? { outDir: desktop ? 'dist-desktop' : 'dist-demo', chunkSizeWarningLimit: 100000, assetsInlineLimit: 100_000_000 }
       : {
         chunkSizeWarningLimit: 1800,
         rollupOptions: { output: { manualChunks: { pdf: ['jspdf', 'jspdf-autotable'], excel: ['exceljs'] } } },

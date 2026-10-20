@@ -15,14 +15,19 @@ export async function buildSeed(root) {
   const db = await PGlite.create({ extensions: { pgcrypto } });
   await db.exec(fs.readFileSync(path.join(root, 'supabase/tests/shim_supabase.sql'), 'utf8'));
   const dir = path.join(root, 'supabase/migrations');
-  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) await db.exec(fs.readFileSync(path.join(dir, f), 'utf8'));
+  const migrations = fs.readdirSync(dir).filter((x) => x.endsWith('.sql')).sort();
+  for (const f of migrations) await db.exec(fs.readFileSync(path.join(dir, f), 'utf8'));
 
   // Contenu des fichiers déposés (le « stockage » de la démonstration), réservé au serveur interne.
   await db.exec(`
     create schema planora_demo;
     create table planora_demo.files (bucket text not null, name text not null, mime text not null, data bytea not null, primary key (bucket, name));
     revoke all on schema planora_demo from public, anon, authenticated;
+    -- Migrations appliquées : une version plus récente du logiciel n'applique que les suivantes.
+    create table planora_demo.migrations (name text primary key, applied_at timestamptz not null default now());
+    revoke all on planora_demo.migrations from public;
   `);
+  for (const f of migrations) await db.query('insert into planora_demo.migrations (name) values ($1)', [f]);
 
   const ids = {};
   for (const a of DEMO_ACCOUNTS) {

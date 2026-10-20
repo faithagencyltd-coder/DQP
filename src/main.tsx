@@ -3,7 +3,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
 import { App } from './App';
-import { isDemo } from './lib/config';
+import { isDemo, isDesktop } from './lib/config';
 import { AuthProvider, OrgProvider } from './lib/session';
 import { ToastProvider } from './ui';
 import './styles.css';
@@ -45,20 +45,20 @@ function renderApp() {
 // Démonstration : la base embarquée est préparée avant l'affichage, et une seule fenêtre peut
 // l'utiliser à la fois (deux onglets sur la même base l'abîmeraient).
 async function startDemo() {
-  root.render(<Splash text="Préparation de la base de démonstration… (quelques secondes au premier lancement)" />);
+  root.render(<Splash text={isDesktop ? 'Ouverture de PLANORA BTP… (quelques secondes au premier lancement)' : 'Préparation de la base de démonstration… (quelques secondes au premier lancement)'} />);
   const run = async () => {
     try {
       const { getDemoDb } = await import('./demo/db');
       await getDemoDb();
       renderApp();
     } catch (e) {
-      root.render(<Splash error text={`La démonstration n’a pas pu démarrer : ${(e as Error).message}. Utilisez une version récente de Chrome, Edge ou Firefox.`} />);
+      root.render(<Splash error text={isDesktop ? `PLANORA BTP n’a pas pu démarrer : ${(e as Error).message}` : `La démonstration n’a pas pu démarrer : ${(e as Error).message}. Utilisez une version récente de Chrome, Edge ou Firefox.`} />);
     }
     await new Promise(() => { /* verrou conservé tant que la page est ouverte */ });
   };
   if (navigator.locks) {
     await navigator.locks.request('planora-btp-demo', { ifAvailable: true }, async (lock) => {
-      if (!lock) { root.render(<Splash error text="PLANORA BTP (démonstration) est déjà ouvert dans un autre onglet ou une autre fenêtre de ce navigateur. Fermez cette page et utilisez l’autre." />); return; }
+      if (!lock) { root.render(<Splash error text={isDesktop ? 'PLANORA BTP est déjà ouvert dans une autre fenêtre. Fermez celle-ci et utilisez l’autre.' : 'PLANORA BTP (démonstration) est déjà ouvert dans un autre onglet ou une autre fenêtre de ce navigateur. Fermez cette page et utilisez l’autre.'} />); return; }
       await run();
     });
   } else await run();

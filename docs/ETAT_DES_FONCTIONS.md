@@ -107,6 +107,17 @@ Détail du module, des coûts et des limites : `docs/RENDU_PLANS.md`.
 | DQE ou BPU type créé directement depuis la bibliothèque : choix des corps d’état (un lot chacun), ordre et sections du DQE d’origine, prix et source repris, quantités laissées à saisir, ouvrages « à vérifier » inclus (signalés) ou écartés, prix d’une autre devise non repris | ✅ Terminé | `tests/library-dqe.test.ts`, recette 65, essai local sur le DQE SENOU (117 ouvrages, 7 lots) |
 | Contrôle bloquant côté serveur des prix « à vérifier » à la validation | ⚠️ **À venir** | aujourd’hui un avertissement, la validation reste possible |
 
+## Logiciel installable Windows (demande du 20/10/2026)
+
+| Élément | État | Vérification |
+|---|---|---|
+| Installeur Windows (x64, en français) : choix du dossier, raccourcis bureau et menu Démarrer, désinstallation sans perte des données | ✅ Terminé | installation silencieuse sous Wine ; construction sur Windows (GitHub Actions) |
+| Logiciel hors ligne : même application et même base (règles d’accès comprises) que la version en ligne, données sur l’ordinateur, une seule fenêtre | ✅ Terminé | `scripts/desktop/smoke.mjs` |
+| Sauvegarde des données (fichier `.planora`) et restauration vérifiée avant remplacement | ✅ Terminé | `scripts/desktop/smoke.mjs` |
+| Mise à jour du logiciel sans perte de données (migrations appliquées à la base existante) | ✅ Terminé | `tests/demo-upgrade.test.ts` |
+| Signature numérique de l’installeur | ⚠️ **À venir** | sans certificat, Windows affiche un avertissement au premier lancement |
+| Travail à plusieurs postes sur les mêmes données | ⚠️ **À venir** | réservé à la version en ligne (Supabase) |
+
 ## Autres fonctions livrées
 
 | Élément | État |
