@@ -45,7 +45,8 @@ async function addClient(page, name) {
 }
 // Après un redémarrage ou une restauration, la session peut être conservée : connexion seulement si besoin.
 async function ensureLoggedIn(page) {
-  const app = page.getByRole('link', { name: 'Clients et fournisseurs' }).first();
+  // Bandeau du logiciel : présent dès que l'application est ouverte (quelle que soit la largeur de la fenêtre).
+  const app = page.getByRole('button', { name: 'Sauvegarder les données', exact: true });
   const form = page.getByLabel('Adresse e-mail');
   await Promise.race([app.waitFor(), form.waitFor()]);
   if (await form.isVisible().catch(() => false)) await login(page);
